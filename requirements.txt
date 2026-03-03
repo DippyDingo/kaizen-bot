@@ -1,0 +1,28 @@
+# Telegram бот
+aiogram==3.13.0
+
+# База данных
+sqlalchemy==2.0.36
+alembic==1.14.0
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+
+# Django (бэкенд и админка)
+django==5.1.4
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+
+# Планировщик задач
+apscheduler==3.10.4
+
+# Настройки и окружение
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+
+# HTTP клиент — версия совместимая с aiogram
+aiohttp==3.10.11
+httpx==0.28.1
+
+# Утилиты
+pillow==11.1.0
+python-dateutil==2.9.0
