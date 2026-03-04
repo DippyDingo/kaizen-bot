@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: KAIZEN-bot_db
+    container_name: kaizen_db
     environment:
-      POSTGRES_DB: KAIZEN-bot_db
+      POSTGRES_DB: second_brain
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
