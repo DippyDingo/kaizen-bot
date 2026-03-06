@@ -919,3 +919,7 @@
 - Validation after the multi-screen Web App pass:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed with 55 tests.
+
+- 2026-03-07: Web App button label changed to Open to avoid emoji rendering issues in Telegram.
+
+- 2026-03-07: Fixed Web App date navigation bug caused by toISOString-based day shifts; selectedDate now uses pure-date helpers and right navigation works in Mini App timezones.

@@ -98,7 +98,7 @@ HOME_DUEL_OPPONENT_WATER_ML = 800
 HOME_TRACK_TITLE = "Naruto OST - Sadness and Sorrow"
 HOME_COMPANION_ROLE = "Мудрый наставник"
 
-WEBAPP_BUTTON_TEXT = "🌐 App"
+WEBAPP_BUTTON_TEXT = "Open"
 BAR_STEPS = 5
 BAR_EMPTY = "⬜️"
 BAR_FILLED: dict[str, str] = {

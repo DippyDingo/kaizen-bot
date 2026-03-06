@@ -34,6 +34,7 @@ from .constants import (
     CLEARED_COMMAND_CHATS,
     CONFIGURED_REPLY_KEYBOARD_CHATS,
     CONFIGURED_WEBAPP_CHATS,
+    WEBAPP_BUTTON_TEXT,
     router,
 )
 from .telemetry import log_ui_event
@@ -42,7 +43,7 @@ from .telemetry import log_ui_event
 def _webapp_row() -> list[InlineKeyboardButton]:
     return [
         InlineKeyboardButton(
-            text="🌐 App",
+            text=WEBAPP_BUTTON_TEXT,
             web_app=WebAppInfo(url=settings.webapp_url),
         )
     ]
@@ -78,7 +79,7 @@ async def _set_webapp_menu_button(message: Message) -> None:
     try:
         await message.bot.set_chat_menu_button(
             chat_id=chat_id,
-            menu_button=MenuButtonWebApp(text="🌐 App", web_app=WebAppInfo(url=settings.webapp_url)),
+            menu_button=MenuButtonWebApp(text=WEBAPP_BUTTON_TEXT, web_app=WebAppInfo(url=settings.webapp_url)),
         )
         CONFIGURED_WEBAPP_CHATS.add(chat_id)
         log_ui_event("webapp_button_configured", chat_id=chat_id)

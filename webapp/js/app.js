@@ -1,5 +1,5 @@
 ﻿import { ApiError, bootstrapTelegramWebApp, createApiClient } from "./api.js";
-import { $, formatDateLabel, formatPeriodLabel, setText } from "./formatters.js";
+import { $, formatDateLabel, formatPeriodLabel, getTodayIsoDate, setText, shiftIsoDate } from "./formatters.js";
 import { renderDashboardScreen } from "./renderers/dashboard.js";
 import { renderHealthScreen } from "./renderers/health.js";
 import { renderStatsScreen } from "./renderers/stats.js";
@@ -21,7 +21,7 @@ const SCREEN_TITLES = {
 
 const appState = {
     activeScreen: "dashboard",
-    selectedDate: new Date().toISOString().slice(0, 10),
+    selectedDate: getTodayIsoDate(),
     statsPeriod: "7d",
     cache: new Map(),
     api: null,
@@ -33,9 +33,7 @@ function cacheKey(screen) {
 }
 
 function shiftSelectedDate(diffDays) {
-    const base = new Date(`${appState.selectedDate}T00:00:00`);
-    base.setDate(base.getDate() + diffDays);
-    appState.selectedDate = base.toISOString().slice(0, 10);
+    appState.selectedDate = shiftIsoDate(appState.selectedDate, diffDays);
 }
 
 function setStatus(message, kind = "info", { visible = true } = {}) {
@@ -218,3 +216,5 @@ function bootstrap() {
 }
 
 bootstrap();
+
+
