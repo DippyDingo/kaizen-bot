@@ -1,0 +1,355 @@
+:root {
+    --bg: #f3efe5;
+    --surface: rgba(255, 250, 240, 0.86);
+    --surface-strong: #fffaf0;
+    --ink: #182127;
+    --muted: #6a706d;
+    --line: rgba(24, 33, 39, 0.12);
+    --accent: #b6542f;
+    --accent-soft: rgba(182, 84, 47, 0.14);
+    --water: #2d7dd2;
+    --sleep: #f0b429;
+    --tasks: #2f8f5b;
+    --panel-shadow: 0 20px 45px rgba(32, 28, 18, 0.08);
+    --radius-xl: 28px;
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --font-sans: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+    --font-display: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top left, rgba(45, 125, 210, 0.16), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(182, 84, 47, 0.18), transparent 30%),
+        linear-gradient(180deg, #f8f2e8 0%, var(--bg) 100%);
+    color: var(--ink);
+    font-family: var(--font-sans);
+}
+
+.app-shell {
+    position: relative;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 28px 16px 48px;
+}
+
+.ambient {
+    position: fixed;
+    width: 240px;
+    height: 240px;
+    border-radius: 999px;
+    filter: blur(28px);
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.ambient-left {
+    top: 10%;
+    left: -60px;
+    background: rgba(45, 125, 210, 0.25);
+}
+
+.ambient-right {
+    right: -60px;
+    bottom: 15%;
+    background: rgba(182, 84, 47, 0.24);
+}
+
+.card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--panel-shadow);
+    backdrop-filter: blur(14px);
+    animation: rise-fade 320ms ease both;
+}
+
+.hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 28px;
+    background:
+        linear-gradient(135deg, rgba(255, 250, 240, 0.92) 0%, rgba(246, 237, 221, 0.92) 100%);
+}
+
+.hero h1,
+.section-heading h2,
+.health-block h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    letter-spacing: -0.04em;
+}
+
+.hero h1 {
+    font-size: clamp(1.9rem, 3vw, 3rem);
+    line-height: 0.95;
+}
+
+.hero-subtitle {
+    margin: 10px 0 0;
+    max-width: 48ch;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.eyebrow {
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.ghost-button {
+    border: 1px solid rgba(24, 33, 39, 0.15);
+    background: rgba(255, 255, 255, 0.45);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 12px 18px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.metric-cluster,
+.progress-panel,
+.focus-panel,
+.health-panel,
+.stats-panel,
+.status-card {
+    padding: 24px;
+}
+
+.metric-cluster {
+    grid-column: span 7;
+}
+
+.progress-panel {
+    grid-column: span 5;
+}
+
+.focus-panel,
+.health-panel,
+.stats-panel,
+.status-card {
+    grid-column: span 12;
+}
+
+.section-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 18px;
+}
+
+.metric-grid,
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.metric-card,
+.stat-tile {
+    padding: 18px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1px solid rgba(24, 33, 39, 0.08);
+}
+
+.metric-label,
+.stat-label,
+.progress-label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.metric-value,
+.stat-tile strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 1.5rem;
+    font-family: var(--font-display);
+}
+
+.metric-subvalue {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.progress-list {
+    display: grid;
+    gap: 16px;
+}
+
+.progress-row {
+    display: grid;
+    gap: 8px;
+}
+
+.progress-copy {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.progress-value {
+    font-family: var(--font-display);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(24, 33, 39, 0.08);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    width: 0;
+    transition: width 220ms ease;
+}
+
+.progress-fill-tasks {
+    background: linear-gradient(90deg, #2f8f5b 0%, #77c093 100%);
+}
+
+.progress-fill-water {
+    background: linear-gradient(90deg, #2d7dd2 0%, #66a6e7 100%);
+}
+
+.progress-fill-sleep {
+    background: linear-gradient(90deg, #f0b429 0%, #ffd267 100%);
+}
+
+.focus-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.focus-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+    border: 1px solid rgba(24, 33, 39, 0.08);
+}
+
+.focus-priority {
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+}
+
+.focus-empty {
+    color: var(--muted);
+}
+
+.health-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.health-block {
+    padding: 18px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    border: 1px solid rgba(24, 33, 39, 0.08);
+}
+
+.health-block h3 {
+    margin-bottom: 14px;
+    font-size: 1.1rem;
+}
+
+.data-list {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.data-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.data-list dt {
+    color: var(--muted);
+}
+
+.data-list dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+}
+
+.status-card {
+    background: rgba(255, 244, 226, 0.88);
+}
+
+.status-card-hidden {
+    display: none;
+}
+
+@keyframes rise-fade {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 840px) {
+    .metric-cluster,
+    .progress-panel,
+    .focus-panel,
+    .health-panel,
+    .stats-panel,
+    .status-card {
+        grid-column: span 12;
+    }
+
+    .health-columns,
+    .metric-grid,
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero {
+        flex-direction: column;
+    }
+}

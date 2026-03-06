@@ -9,6 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     bot_token: str
     webapp_url: str = "https://example.com"
+    api_host: str = "127.0.0.1"
+    api_port: int = 8080
 
     database_url: str
     db_host: str = "localhost"
