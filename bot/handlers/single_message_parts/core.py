@@ -21,15 +21,17 @@ from .common import (
     VIEW_HOME,
     VIEW_STATS,
     VIEW_TASKS,
+    _back_row,
     _build_companion_hint,
     _build_mana_bar,
     _build_meter,
     _clamp_percent,
+    _date_nav_row,
     _format_long_date,
     _month_start,
     _render,
     _reset_context,
-    _set_webapp_menu_button,
+    _setup_chat_ui,
     router,
 )
 
@@ -38,22 +40,24 @@ def _home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="💧 +150мл", callback_data="water:150"),
-                InlineKeyboardButton(text="💧 +250мл", callback_data="water:250"),
-                InlineKeyboardButton(text="💧 +500мл", callback_data="water:500"),
+                InlineKeyboardButton(text="💧150", callback_data="water:150"),
+                InlineKeyboardButton(text="💧250", callback_data="water:250"),
+                InlineKeyboardButton(text="💧500", callback_data="water:500"),
+            ],
+            [InlineKeyboardButton(text="↩️ Вода", callback_data="water:undo")],
+            [
+                InlineKeyboardButton(text="➕ Задача", callback_data="task:add"),
+                InlineKeyboardButton(text="➕ Запись", callback_data="diary:add"),
             ],
             [
-                InlineKeyboardButton(text="➕ Добавить Дейлик", callback_data="task:add"),
+                InlineKeyboardButton(text="📋 Задачи", callback_data="view:tasks"),
                 InlineKeyboardButton(text="📝 Дневник", callback_data="view:diary"),
             ],
             [
-                InlineKeyboardButton(text="🗂 Задачи", callback_data="view:tasks"),
                 InlineKeyboardButton(text="📅 Календарь", callback_data="view:calendar"),
+                InlineKeyboardButton(text="📊 Статистика", callback_data="view:stats"),
             ],
-            [
-                InlineKeyboardButton(text="📈 Статистика", callback_data="view:stats"),
-                InlineKeyboardButton(text="💧 Здоровье", callback_data="view:health"),
-            ],
+            [InlineKeyboardButton(text="💧 Вода", callback_data="view:health")],
         ]
     )
 
@@ -61,12 +65,8 @@ def _home_keyboard() -> InlineKeyboardMarkup:
 def _build_stats_keyboard(selected_date: date) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(text="◀️ День", callback_data="date:shift:-1"),
-                InlineKeyboardButton(text=selected_date.strftime("%d.%m.%Y"), callback_data="cal:noop"),
-                InlineKeyboardButton(text="День ▶️", callback_data="date:shift:1"),
-            ],
-            [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="view:home")],
+            _date_nav_row(selected_date),
+            _back_row(),
         ]
     )
 
@@ -135,6 +135,24 @@ def _build_stats_text(user, tasks: list, water_ml: int, sleep_minutes: int, sele
     return "\n".join(lines)
 
 
+async def _render_command_view(message: Message, state: FSMContext, view_mode: str, notice: str | None = None) -> None:
+    await _reset_context(state, view_mode=view_mode)
+    await _setup_chat_ui(message)
+    await _render(from_user=message.from_user, state=state, message=message, notice=notice)
+
+
+def _resolve_cancel_view(raw_state: str | None) -> str:
+    if raw_state in {
+        DashboardStates.waiting_task_title.state,
+        DashboardStates.waiting_task_priority.state,
+        DashboardStates.waiting_task_date.state,
+    }:
+        return VIEW_TASKS
+    if raw_state == DashboardStates.waiting_diary_text.state:
+        return VIEW_DIARY
+    return VIEW_HOME
+
+
 @router.message(Command("start"))
 @router.message(Command("dashboard"))
 async def cmd_start(message: Message, state: FSMContext) -> None:
@@ -145,19 +163,75 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         calendar_month=_month_start(today).isoformat(),
         view_mode=VIEW_HOME,
     )
-    await _set_webapp_menu_button(message)
+    await _setup_chat_ui(message)
     await _render(from_user=message.from_user, state=state, message=message)
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, state: FSMContext) -> None:
-    await _set_webapp_menu_button(message)
+    await _setup_chat_ui(message)
     await _render(
         from_user=message.from_user,
         state=state,
         message=message,
-        notice="Из главного меню вход в раздел, внутри только кнопки раздела и назад.",
+        notice="Нижняя кнопка чата открывает Web App. Разделы и быстрые действия находятся в главном сообщении.",
     )
+
+
+@router.message(Command("home"))
+async def cmd_home(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_HOME)
+
+
+@router.message(Command("tasks"))
+async def cmd_tasks(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_TASKS)
+
+
+@router.message(Command("calendar"))
+async def cmd_calendar(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_CALENDAR)
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_STATS)
+
+
+@router.message(Command("health"))
+async def cmd_health(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_HEALTH)
+
+
+@router.message(Command("diary"))
+async def cmd_diary(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_DIARY)
+
+
+@router.message(Command("today"))
+async def cmd_today(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    current_view = data.get("view_mode", VIEW_HOME)
+    today = date.today()
+    await _reset_context(state, view_mode=current_view)
+    await state.update_data(
+        selected_date=today.isoformat(),
+        calendar_month=_month_start(today).isoformat(),
+    )
+    await _setup_chat_ui(message)
+    await _render(
+        from_user=message.from_user,
+        state=state,
+        message=message,
+        notice=f"Дата: {today.strftime('%d.%m.%Y')}",
+    )
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    target_view = _resolve_cancel_view(current_state)
+    await _render_command_view(message, state, target_view, notice="Действие отменено")
 
 
 @router.callback_query(F.data == "cal:noop")

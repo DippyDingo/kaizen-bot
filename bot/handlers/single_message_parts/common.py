@@ -3,10 +3,24 @@
 import html
 from datetime import date, datetime, timedelta
 
-from aiogram import Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Message, WebAppInfo
+from aiogram.types import (
+    BotCommandScopeChat,
+    BotCommandScopeChatAdministrators,
+    BotCommandScopeChatMember,
+    BotCommandScopeDefault,
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeAllGroupChats,
+    BotCommandScopeAllChatAdministrators,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
 
 from backend.database import async_session
 from backend.services.diary_service import get_day_diary_entries_count, list_day_diary_entries
@@ -17,8 +31,15 @@ from bot.config import settings
 from bot.states import DashboardStates
 
 router = Router()
+router.message.filter(F.chat.type == "private")
+router.callback_query.filter(F.message.chat.type == "private")
 
-DASHBOARD_MESSAGES: dict[int, tuple[int, int]] = {}
+DashboardKey = tuple[int, int]
+DashboardMessageRef = tuple[int, int]
+
+DASHBOARD_MESSAGES: dict[DashboardKey, DashboardMessageRef] = {}
+CONFIGURED_WEBAPP_CHATS: set[int] = set()
+CLEARED_COMMAND_CHATS: set[int] = set()
 MAX_TRACKED_OUTPUT_MESSAGES = 80
 
 VIEW_HOME = "home"
@@ -82,7 +103,7 @@ HOME_DUEL_OPPONENT_WATER_ML = 800
 HOME_TRACK_TITLE = "Naruto OST - Sadness and Sorrow"
 HOME_COMPANION_ROLE = "Мудрый наставник"
 
-WEBAPP_MENU_TEXT = "📱 Открыть Web App (Инвентарь, Карта, Графики)"
+WEBAPP_BUTTON_TEXT = "🌐 App"
 
 
 def _short(text: str, limit: int = 22) -> str:
@@ -148,7 +169,15 @@ def _build_companion_hint(stamina_percent: int, water_ml: int, done_count: int, 
 
 
 def _back_row() -> list[InlineKeyboardButton]:
-    return [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="view:home")]
+    return [InlineKeyboardButton(text="⬅️ Меню", callback_data="view:home")]
+
+
+def _date_nav_row(selected_date: date) -> list[InlineKeyboardButton]:
+    return [
+        InlineKeyboardButton(text="◀️", callback_data="date:shift:-1"),
+        InlineKeyboardButton(text=selected_date.strftime("%d.%m"), callback_data="cal:noop"),
+        InlineKeyboardButton(text="▶️", callback_data="date:shift:1"),
+    ]
 
 
 def _diary_type_label(entry_type: str) -> str:
@@ -221,14 +250,66 @@ def _extract_diary_payload(message: Message) -> dict | None:
     return None
 
 
+def _webapp_row() -> list[InlineKeyboardButton]:
+    return [
+        InlineKeyboardButton(
+            text=WEBAPP_BUTTON_TEXT,
+            web_app=WebAppInfo(url=settings.webapp_url),
+        )
+    ]
+
+
 async def _set_webapp_menu_button(message: Message) -> None:
+    chat_id = message.chat.id
+    if chat_id in CONFIGURED_WEBAPP_CHATS:
+        return
+
     try:
         await message.bot.set_chat_menu_button(
-            chat_id=message.chat.id,
-            menu_button=MenuButtonWebApp(text=WEBAPP_MENU_TEXT, web_app=WebAppInfo(url=settings.webapp_url)),
+            chat_id=chat_id,
+            menu_button=MenuButtonWebApp(text=WEBAPP_BUTTON_TEXT, web_app=WebAppInfo(url=settings.webapp_url)),
         )
+        CONFIGURED_WEBAPP_CHATS.add(chat_id)
     except TelegramBadRequest:
         pass
+
+
+async def initialize_bot_ui(bot: Bot) -> None:
+    scopes = (
+        BotCommandScopeDefault(),
+        BotCommandScopeAllPrivateChats(),
+        BotCommandScopeAllGroupChats(),
+        BotCommandScopeAllChatAdministrators(),
+    )
+    for scope in scopes:
+        try:
+            await bot.delete_my_commands(scope=scope)
+        except TelegramBadRequest:
+            pass
+
+
+async def _clear_chat_commands(message: Message) -> None:
+    chat_id = message.chat.id
+    if chat_id in CLEARED_COMMAND_CHATS:
+        return
+
+    scopes = (
+        BotCommandScopeChat(chat_id=chat_id),
+        BotCommandScopeChatAdministrators(chat_id=chat_id),
+        BotCommandScopeChatMember(chat_id=chat_id, user_id=message.from_user.id),
+    )
+    for scope in scopes:
+        try:
+            await message.bot.delete_my_commands(scope=scope)
+        except TelegramBadRequest:
+            pass
+
+    CLEARED_COMMAND_CHATS.add(chat_id)
+
+
+async def _setup_chat_ui(message: Message) -> None:
+    await _clear_chat_commands(message)
+    await _set_webapp_menu_button(message)
 
 
 async def _load_user_and_metrics(from_user, target_date: date) -> tuple[object, list, int, int, int]:
@@ -248,7 +329,8 @@ async def _load_user_and_metrics(from_user, target_date: date) -> tuple[object, 
 
 
 async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMarkup) -> None:
-    DASHBOARD_MESSAGES[callback.from_user.id] = (callback.message.chat.id, callback.message.message_id)
+    key = (callback.message.chat.id, callback.from_user.id)
+    DASHBOARD_MESSAGES[key] = (callback.message.chat.id, callback.message.message_id)
     try:
         await callback.message.edit_text(text=text, reply_markup=keyboard)
     except TelegramBadRequest as exc:
@@ -257,7 +339,8 @@ async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard:
 
 
 async def _upsert_dashboard_message(message: Message, text: str, keyboard: InlineKeyboardMarkup) -> None:
-    target = DASHBOARD_MESSAGES.get(message.from_user.id)
+    key = (message.chat.id, message.from_user.id)
+    target = DASHBOARD_MESSAGES.get(key)
 
     if target:
         chat_id, message_id = target
@@ -273,7 +356,7 @@ async def _upsert_dashboard_message(message: Message, text: str, keyboard: Inlin
             pass
 
     sent = await message.answer(text=text, reply_markup=keyboard)
-    DASHBOARD_MESSAGES[message.from_user.id] = (sent.chat.id, sent.message_id)
+    DASHBOARD_MESSAGES[key] = (sent.chat.id, sent.message_id)
 
 
 async def _remember_output_message(state: FSMContext, bot_message: Message) -> None:

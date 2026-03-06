@@ -17,6 +17,7 @@ from .common import (
     PRIORITY_TEXT,
     VIEW_TASKS,
     _back_row,
+    _date_nav_row,
     _month_start,
     _parse_iso_date,
     _render,
@@ -28,16 +29,12 @@ from .common import (
 
 def _build_tasks_keyboard(tasks: list, selected_date: date) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        [
-            InlineKeyboardButton(text="◀️ День", callback_data="date:shift:-1"),
-            InlineKeyboardButton(text=selected_date.strftime("%d.%m.%Y"), callback_data="cal:noop"),
-            InlineKeyboardButton(text="День ▶️", callback_data="date:shift:1"),
-        ],
-        [InlineKeyboardButton(text="➕ Добавить задачу", callback_data="task:add")],
+        _date_nav_row(selected_date),
+        [InlineKeyboardButton(text="➕ Задача", callback_data="task:add")],
     ]
 
     if not tasks:
-        rows.append([InlineKeyboardButton(text="На дату задач нет", callback_data="cal:noop")])
+        rows.append([InlineKeyboardButton(text="Пусто", callback_data="cal:noop")])
     else:
         for task in tasks[:12]:
             state = "✅" if task.is_done else "⬜"
@@ -58,9 +55,9 @@ def _build_priority_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔴 Важно", callback_data="task:prio:high")],
-            [InlineKeyboardButton(text="🟡 Обычно", callback_data="task:prio:medium")],
-            [InlineKeyboardButton(text="🟢 Когда-нибудь", callback_data="task:prio:low")],
-            [InlineKeyboardButton(text="↩️ Отмена", callback_data="task:cancel")],
+            [InlineKeyboardButton(text="🟡 Обычн.", callback_data="task:prio:medium")],
+            [InlineKeyboardButton(text="🟢 Потом", callback_data="task:prio:low")],
+            [InlineKeyboardButton(text="↩️ Назад", callback_data="task:cancel")],
         ]
     )
 
@@ -79,24 +76,23 @@ def _build_tasks_text(
         "<b>🗂 ЗАДАЧИ</b>",
         f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
         f"Выполнено: <b>{done_count}/{len(tasks)}</b>",
-        "",
-        "Формат: <b>Задача | ✅ | ❌</b>",
-        "Повторное нажатие ✅ снимает выполнение.",
     ]
 
     if mode == "wait_title":
-        lines.extend(["", "📝 Введи название задачи сообщением."])
+        lines.extend(["", "Отправь название задачи."])
     elif mode == "wait_priority":
-        lines.extend(["", f"📝 Новая задача: <b>{pending_title or ''}</b>", "Выбери приоритет."])
+        lines.extend(["", f"Новая: <b>{pending_title or ''}</b>", "Выбери приоритет."])
     elif mode == "wait_task_date":
         lines.extend(
             [
                 "",
-                f"📝 Новая задача: <b>{pending_title or ''}</b>",
+                f"Новая: <b>{pending_title or ''}</b>",
                 f"Приоритет: <b>{PRIORITY_TEXT.get(pending_priority or '', '')}</b>",
-                "Выбери дату в календаре.",
+                "Выбери дату.",
             ]
         )
+    else:
+        lines.extend(["", "Нажми <b>✅</b>, чтобы отметить, и еще раз <b>✅</b>, чтобы снять."])
 
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])

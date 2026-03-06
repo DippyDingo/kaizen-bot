@@ -17,6 +17,7 @@ from .common import (
     _back_row,
     _build_diary_entry_preview,
     _clear_output_messages,
+    _date_nav_row,
     _diary_type_label,
     _extract_diary_payload,
     _month_start,
@@ -31,18 +32,14 @@ from .common import (
 
 def _build_diary_keyboard(selected_date: date, entries: list) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
+        _date_nav_row(selected_date),
         [
-            InlineKeyboardButton(text="◀️ День", callback_data="date:shift:-1"),
-            InlineKeyboardButton(text=selected_date.strftime("%d.%m.%Y"), callback_data="cal:noop"),
-            InlineKeyboardButton(text="День ▶️", callback_data="date:shift:1"),
-        ],
-        [
-            InlineKeyboardButton(text="➕ Новая запись", callback_data="diary:add"),
+            InlineKeyboardButton(text="➕ Запись", callback_data="diary:add"),
             InlineKeyboardButton(text="📅 Календарь", callback_data="diary:calendar"),
         ],
         [
-            InlineKeyboardButton(text="📤 Показать всё", callback_data="diary:dumpday"),
-            InlineKeyboardButton(text="🧹 Очистить", callback_data="diary:clearout"),
+            InlineKeyboardButton(text="📤 Всё", callback_data="diary:dumpday"),
+            InlineKeyboardButton(text="🧹 Чат", callback_data="diary:clearout"),
         ],
     ]
 
@@ -76,13 +73,12 @@ def _build_diary_text(
     ]
 
     if mode == "wait_text":
-        lines.extend(["", "Отправь запись: текст, кружок, голосовое, фото или видео."])
+        lines.extend(["", "Отправь текст, кружок, голосовое, фото или видео."])
     else:
         lines.extend(
             [
                 "",
-                "Нажми «➕ Новая запись», чтобы добавить запись, «👁 ...» чтобы открыть одну запись в чат.",
-                "Кнопка «📤 Показать всё» отправит все записи дня, «🧹 Очистить» удалит их из чата.",
+                "➕ добавить, 👁 открыть, 📤 показать день, 🧹 очистить чат.",
             ]
         )
 

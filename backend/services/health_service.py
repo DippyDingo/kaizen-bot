@@ -1,10 +1,10 @@
-﻿from datetime import date, datetime
+from datetime import date, datetime
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import SleepLog, User, WaterLog
-from backend.services.rpg_service import EXP_TABLE, add_exp
+from backend.services.rpg_service import EXP_TABLE, add_exp, remove_exp
 
 
 async def add_water_log(
@@ -19,6 +19,38 @@ async def add_water_log(
     await session.commit()
     await session.refresh(user)
     return level_ups
+
+
+async def remove_last_water_log(
+    session: AsyncSession,
+    user: User,
+    target_day: date,
+) -> tuple[int | None, int]:
+    start_dt = datetime.combine(target_day, datetime.min.time())
+    end_dt = datetime.combine(target_day, datetime.max.time())
+
+    result = await session.execute(
+        select(WaterLog)
+        .where(
+            and_(
+                WaterLog.user_id == user.id,
+                WaterLog.logged_at >= start_dt,
+                WaterLog.logged_at <= end_dt,
+            )
+        )
+        .order_by(WaterLog.logged_at.desc(), WaterLog.id.desc())
+        .limit(1)
+    )
+    water_log = result.scalar_one_or_none()
+    if not water_log:
+        return None, 0
+
+    amount_ml = water_log.amount_ml
+    await session.delete(water_log)
+    level_change = -remove_exp(user, EXP_TABLE["water_logged"])
+    await session.commit()
+    await session.refresh(user)
+    return amount_ml, level_change
 
 
 async def get_today_water_total(session: AsyncSession, user_id: int, today: date) -> int:

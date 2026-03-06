@@ -65,11 +65,11 @@ def _build_calendar_keyboard(month_date: date, selected_date: date, context: str
     rows.append(
         [
             InlineKeyboardButton(
-                text="◀️ Месяц",
+                text="◀️",
                 callback_data=f"cal:nav:{context}:{_prev_month(month_date).isoformat()}",
             ),
             InlineKeyboardButton(
-                text="Месяц ▶️",
+                text="▶️",
                 callback_data=f"cal:nav:{context}:{_next_month(month_date).isoformat()}",
             ),
         ]
@@ -78,18 +78,18 @@ def _build_calendar_keyboard(month_date: date, selected_date: date, context: str
     if context == "create":
         rows.append(
             [
-                InlineKeyboardButton(text="Сегодня", callback_data="cal:today:create"),
-                InlineKeyboardButton(text="↩️ Отмена", callback_data="task:cancel"),
+                InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:create"),
+                InlineKeyboardButton(text="↩️ Назад", callback_data="task:cancel"),
             ]
         )
     elif context == "browse":
-        rows.append([InlineKeyboardButton(text="Сегодня", callback_data="cal:today:browse")])
-        rows.append([InlineKeyboardButton(text="📋 Открыть задачи даты", callback_data="cal:to_tasks")])
+        rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:browse")])
+        rows.append([InlineKeyboardButton(text="📋 Задачи", callback_data="cal:to_tasks")])
         rows.append(_back_row())
     elif context == "diary":
-        rows.append([InlineKeyboardButton(text="Сегодня", callback_data="cal:today:diary")])
-        rows.append([InlineKeyboardButton(text="📝 Открыть записи даты", callback_data="cal:to_diary")])
-        rows.append([InlineKeyboardButton(text="↩️ Назад в дневник", callback_data="diary:close_calendar")])
+        rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:diary")])
+        rows.append([InlineKeyboardButton(text="📝 Записи", callback_data="cal:to_diary")])
+        rows.append([InlineKeyboardButton(text="↩️ Дневник", callback_data="diary:close_calendar")])
     else:
         rows.append(_back_row())
 
@@ -100,7 +100,7 @@ def _build_calendar_text(selected_date: date, notice: str | None) -> str:
     lines = [
         "<b>📅 КАЛЕНДАРЬ</b>",
         f"Выбранная дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
-        "Выбери дату и нажми «Открыть задачи даты».",
+        "Выбери день и открой задачи.",
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])
@@ -111,7 +111,7 @@ def _build_diary_calendar_text(selected_date: date, notice: str | None) -> str:
     lines = [
         "<b>📅 КАЛЕНДАРЬ ДНЕВНИКА</b>",
         f"Выбранная дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
-        "Выбери день и нажми «Открыть записи даты».",
+        "Выбери день и открой записи.",
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])

@@ -7,6 +7,7 @@ from aiogram.enums import ParseMode
 
 from bot.config import settings
 from bot.handlers import single_message_router
+from bot.handlers.single_message_parts.common import initialize_bot_ui
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +27,7 @@ dp.include_router(single_message_router)
 async def main() -> None:
     logger.info("Starting KAIZEN bot")
     logger.info("Environment: %s", settings.environment)
+    await initialize_bot_ui(bot)
     await dp.start_polling(bot)
 
 
