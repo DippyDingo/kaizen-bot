@@ -393,6 +393,7 @@ async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> b
     )
     await state.set_state(DashboardStates.waiting_display_name)
     await _setup_chat_ui(message, force_keyboard=True, keyboard_text="Как тебя называть?")
+    await _relocate_dashboard_message(message, state)
     await _render(
         from_user=message.from_user,
         state=state,

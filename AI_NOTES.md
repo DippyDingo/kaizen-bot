@@ -777,3 +777,14 @@
 - Validation after the relocation fix:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 21 tests.
+
+## 2026-03-07 Start Flow Relocation Fix
+
+- Fixed the `/start` and onboarding flows after chat history deletion.
+- Root issue: the reply-keyboard carrier message `Меню` was sent near the bottom, but `/start` could still try to reuse or leave the dashboard pointer without relocating the actual dashboard message to the current point in chat.
+- Updated `/start` so it now calls `_relocate_dashboard_message(...)` before rendering the main screen.
+- Updated the name-onboarding start flow to do the same, so first-run users also get the visible profile/onboarding screen under the current chat position.
+- Added regression test `test_cmd_start_relocates_dashboard_before_render`.
+- Validation after the start-flow fix:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 22 tests.

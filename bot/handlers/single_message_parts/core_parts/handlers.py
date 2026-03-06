@@ -18,7 +18,7 @@ from backend.services.user_service import (
 )
 from bot.states import DashboardStates
 
-from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_HOME, VIEW_PROFILE, VIEW_SETTINGS, VIEW_STATS, VIEW_TASKS, VIEW_WATER, _month_start, _render, _reset_context, _setup_chat_ui, router
+from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_HOME, VIEW_PROFILE, VIEW_SETTINGS, VIEW_STATS, VIEW_TASKS, VIEW_WATER, _month_start, _relocate_dashboard_message, _render, _reset_context, _setup_chat_ui, router
 from .builders import STATS_PERIOD_LABELS, _maybe_start_name_onboarding, _render_command_view, _resolve_cancel_view
 
 
@@ -35,6 +35,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         view_mode=VIEW_HOME,
     )
     await _setup_chat_ui(message, force_keyboard=True)
+    await _relocate_dashboard_message(message, state)
     await _render(from_user=message.from_user, state=state, message=message)
 
 
