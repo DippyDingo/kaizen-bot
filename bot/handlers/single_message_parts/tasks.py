@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import html
 from datetime import date, datetime
 
 from aiogram import F
@@ -16,15 +17,24 @@ from bot.states import DashboardStates
 from .common import (
     PRIORITY_TEXT,
     VIEW_TASKS,
-    _back_row,
     _date_nav_row,
     _month_start,
     _parse_iso_date,
     _render,
     _reset_context,
-    _short,
     router,
 )
+
+
+PRIORITY_BADGES: dict[str, str] = {
+    "high": "🔴",
+    "medium": "🟡",
+    "low": "🟢",
+}
+
+
+def _task_priority_badge(priority: str) -> str:
+    return PRIORITY_BADGES.get(priority, "⚪")
 
 
 def _build_tasks_keyboard(tasks: list, selected_date: date) -> InlineKeyboardMarkup:
@@ -37,17 +47,18 @@ def _build_tasks_keyboard(tasks: list, selected_date: date) -> InlineKeyboardMar
         rows.append([InlineKeyboardButton(text="Пусто", callback_data="cal:noop")])
     else:
         for task in tasks[:12]:
-            state = "✅" if task.is_done else "⬜"
-            title = f"{state} {_short(task.title)}"
+            title = f"{_task_priority_badge(task.priority)} {task.title.strip()}"
             rows.append(
                 [
-                    InlineKeyboardButton(text=title, callback_data="cal:noop"),
-                    InlineKeyboardButton(text="✅", callback_data=f"task:toggle:{task.id}"),
+                    InlineKeyboardButton(
+                        text=title,
+                        callback_data=f"task:toggle:{task.id}",
+                        style="success" if task.is_done else "danger",
+                    ),
                     InlineKeyboardButton(text="❌", callback_data=f"task:drop:{task.id}"),
                 ]
             )
 
-    rows.append(_back_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -92,7 +103,15 @@ def _build_tasks_text(
             ]
         )
     else:
-        lines.extend(["", "Нажми <b>✅</b>, чтобы отметить, и еще раз <b>✅</b>, чтобы снять."])
+        lines.extend(["", "Нажми на задачу, чтобы переключить выполнение. Кнопка <b>❌</b> удаляет задачу."])
+        if tasks:
+            lines.extend(["", "<b>Список задач:</b>"])
+            for task in tasks[:12]:
+                badge = _task_priority_badge(task.priority)
+                title = html.escape(task.title)
+                if task.is_done:
+                    title = f"<s>{title}</s>"
+                lines.append(f"{badge} {title}")
 
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])

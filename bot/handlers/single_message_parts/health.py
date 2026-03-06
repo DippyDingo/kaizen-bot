@@ -10,7 +10,7 @@ from backend.database import async_session
 from backend.services.health_service import add_water_log, remove_last_water_log
 from backend.services.user_service import get_or_create_user
 
-from .common import _back_row, _date_nav_row, _parse_iso_date, _render, router
+from .common import _date_nav_row, _parse_iso_date, _render, router
 
 
 def _build_health_keyboard(selected_date: date) -> InlineKeyboardMarkup:
@@ -23,7 +23,6 @@ def _build_health_keyboard(selected_date: date) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="💧500", callback_data="water:500"),
             ],
             [InlineKeyboardButton(text="↩️ Вода", callback_data="water:undo")],
-            _back_row(),
         ]
     )
 

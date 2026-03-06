@@ -69,6 +69,13 @@ async def get_today_water_total(session: AsyncSession, user_id: int, today: date
     return int(result.scalar_one())
 
 
+async def get_water_total_all_time(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(
+        select(func.coalesce(func.sum(WaterLog.amount_ml), 0)).where(WaterLog.user_id == user_id)
+    )
+    return int(result.scalar_one())
+
+
 async def get_day_sleep_total_minutes(session: AsyncSession, user_id: int, target_day: date) -> int:
     start_dt = datetime.combine(target_day, datetime.min.time())
     end_dt = datetime.combine(target_day, datetime.max.time())
@@ -91,6 +98,13 @@ async def get_day_sleep_total_minutes(session: AsyncSession, user_id: int, targe
             total_minutes += int((overlap_end - overlap_start).total_seconds() // 60)
 
     return total_minutes
+
+
+async def get_sleep_total_minutes_all_time(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(
+        select(func.coalesce(func.sum(SleepLog.duration_min), 0)).where(SleepLog.user_id == user_id)
+    )
+    return int(result.scalar_one())
 
 
 async def add_sleep_log(

@@ -25,9 +25,14 @@ from aiogram.types import (
 )
 
 from backend.database import async_session
-from backend.services.diary_service import get_day_diary_entries_count, list_day_diary_entries
-from backend.services.health_service import get_day_sleep_total_minutes, get_today_water_total
-from backend.services.task_service import list_tasks_for_date
+from backend.services.diary_service import get_day_diary_entries_count, get_total_diary_entries_count, list_day_diary_entries
+from backend.services.health_service import (
+    get_day_sleep_total_minutes,
+    get_sleep_total_minutes_all_time,
+    get_today_water_total,
+    get_water_total_all_time,
+)
+from backend.services.task_service import get_task_totals, list_tasks_for_date
 from backend.services.user_service import get_or_create_user
 from bot.config import settings
 from bot.states import DashboardStates
@@ -43,6 +48,7 @@ DASHBOARD_MESSAGES: dict[DashboardKey, DashboardMessageRef] = {}
 CONFIGURED_WEBAPP_CHATS: set[int] = set()
 CLEARED_COMMAND_CHATS: set[int] = set()
 CONFIGURED_REPLY_KEYBOARD_CHATS: set[int] = set()
+CHAT_KEYBOARD_MESSAGES: dict[int, int] = {}
 MAX_TRACKED_OUTPUT_MESSAGES = 80
 
 VIEW_HOME = "home"
@@ -51,13 +57,16 @@ VIEW_CALENDAR = "calendar"
 VIEW_STATS = "stats"
 VIEW_HEALTH = "health"
 VIEW_DIARY = "diary"
+VIEW_PROFILE = "profile"
+VIEW_SETTINGS = "settings"
 
 CHAT_BUTTON_HOME = "🏠 Главная"
 CHAT_BUTTON_TASKS = "📋 Задачи"
 CHAT_BUTTON_DIARY = "📝 Дневник"
 CHAT_BUTTON_CALENDAR = "📅 Календарь"
 CHAT_BUTTON_STATS = "📊 Статистика"
-CHAT_BUTTON_HEALTH = "💧 Вода"
+CHAT_BUTTON_HEALTH = "❤️ Здоровье"
+CHAT_BUTTON_SETTINGS = "⚙️ Настройки"
 
 CHAT_NAVIGATION: dict[str, str] = {
     CHAT_BUTTON_HOME: VIEW_HOME,
@@ -66,6 +75,7 @@ CHAT_NAVIGATION: dict[str, str] = {
     CHAT_BUTTON_CALENDAR: VIEW_CALENDAR,
     CHAT_BUTTON_STATS: VIEW_STATS,
     CHAT_BUTTON_HEALTH: VIEW_HEALTH,
+    CHAT_BUTTON_SETTINGS: VIEW_SETTINGS,
 }
 
 PRIORITY_TEXT: dict[str, str] = {
@@ -132,6 +142,19 @@ def _short(text: str, limit: int = 22) -> str:
     return text[: limit - 1] + "…"
 
 
+def _display_name(user) -> str:
+    preferred_name = getattr(user, "preferred_name", None)
+    if preferred_name:
+        return preferred_name
+    first_name = getattr(user, "first_name", None)
+    if first_name:
+        return first_name
+    username = getattr(user, "username", None)
+    if username:
+        return username
+    return "Игрок"
+
+
 def _parse_iso_date(value: str | None, default: date) -> date:
     if not value:
         return default
@@ -185,10 +208,6 @@ def _build_companion_hint(stamina_percent: int, water_ml: int, done_count: int, 
     if total_tasks > 0 and done_count < total_tasks:
         return "Добей оставшиеся дейлики сегодня, чтобы не ронять streak."
     return "Темп хороший. Закрепи результат и не теряй ритм."
-
-
-def _back_row() -> list[InlineKeyboardButton]:
-    return [InlineKeyboardButton(text="⬅️ Меню", callback_data="view:home")]
 
 
 def _date_nav_row(selected_date: date) -> list[InlineKeyboardButton]:
@@ -284,6 +303,7 @@ def _chat_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=CHAT_BUTTON_HOME), KeyboardButton(text=CHAT_BUTTON_TASKS)],
             [KeyboardButton(text=CHAT_BUTTON_DIARY), KeyboardButton(text=CHAT_BUTTON_CALENDAR)],
             [KeyboardButton(text=CHAT_BUTTON_STATS), KeyboardButton(text=CHAT_BUTTON_HEALTH)],
+            [KeyboardButton(text=CHAT_BUTTON_SETTINGS)],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -339,23 +359,31 @@ async def _clear_chat_commands(message: Message) -> None:
     CLEARED_COMMAND_CHATS.add(chat_id)
 
 
-async def _ensure_chat_keyboard(message: Message) -> None:
+async def _ensure_chat_keyboard(message: Message, *, force: bool = False, text: str = "🧭 Меню") -> None:
     chat_id = message.chat.id
-    if chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS:
+    if not force and chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS:
         return
 
-    await message.answer(
-        "🧭 Меню",
+    previous_message_id = CHAT_KEYBOARD_MESSAGES.get(chat_id)
+    sent = await message.answer(
+        text,
         reply_markup=_chat_keyboard(),
         disable_notification=True,
     )
+    CHAT_KEYBOARD_MESSAGES[chat_id] = sent.message_id
     CONFIGURED_REPLY_KEYBOARD_CHATS.add(chat_id)
 
+    if previous_message_id and previous_message_id != sent.message_id:
+        try:
+            await message.bot.delete_message(chat_id=chat_id, message_id=previous_message_id)
+        except TelegramBadRequest:
+            pass
 
-async def _setup_chat_ui(message: Message) -> None:
+
+async def _setup_chat_ui(message: Message, *, force_keyboard: bool = False, keyboard_text: str = "🧭 Меню") -> None:
     await _clear_chat_commands(message)
     await _set_webapp_menu_button(message)
-    await _ensure_chat_keyboard(message)
+    await _ensure_chat_keyboard(message, force=force_keyboard, text=keyboard_text)
 
 
 @router.message(F.text.in_(tuple(CHAT_NAVIGATION)))
@@ -386,9 +414,33 @@ async def _load_user_and_metrics(from_user, target_date: date) -> tuple[object, 
     return user, tasks, water_ml, sleep_minutes, diary_count
 
 
+async def _load_user_all_time_stats(from_user) -> tuple[object, dict[str, int]]:
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=from_user.id,
+            first_name=from_user.first_name,
+            username=from_user.username,
+            last_name=from_user.last_name,
+        )
+        tasks_total, tasks_done = await get_task_totals(session, user.id)
+        water_total_ml = await get_water_total_all_time(session, user.id)
+        sleep_total_minutes = await get_sleep_total_minutes_all_time(session, user.id)
+        diary_total = await get_total_diary_entries_count(session, user.id)
+    return user, {
+        "tasks_total": tasks_total,
+        "tasks_done": tasks_done,
+        "water_total_ml": water_total_ml,
+        "sleep_total_minutes": sleep_total_minutes,
+        "diary_total": diary_total,
+    }
+
+
 async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMarkup) -> None:
     key = (callback.message.chat.id, callback.from_user.id)
     DASHBOARD_MESSAGES[key] = (callback.message.chat.id, callback.message.message_id)
+    if callback.message.chat.id not in CONFIGURED_REPLY_KEYBOARD_CHATS:
+        await _ensure_chat_keyboard(callback.message)
     try:
         await callback.message.edit_text(text=text, reply_markup=keyboard)
     except TelegramBadRequest as exc:
@@ -471,7 +523,16 @@ async def _render(
     notice: str | None = None,
 ) -> None:
     from .calendar import _build_calendar_keyboard, _build_calendar_text, _build_diary_calendar_text
-    from .core import _build_home_text, _build_stats_keyboard, _build_stats_text, _home_keyboard
+    from .core import (
+        _build_home_text,
+        _build_profile_keyboard,
+        _build_profile_text,
+        _build_settings_keyboard,
+        _build_settings_text,
+        _build_stats_keyboard,
+        _build_stats_text,
+        _home_keyboard,
+    )
     from .diary import _build_diary_keyboard, _build_diary_text
     from .health import _build_health_keyboard, _build_health_text
     from .tasks import _build_priority_keyboard, _build_tasks_keyboard, _build_tasks_text
@@ -484,6 +545,7 @@ async def _render(
     current_state = await state.get_state()
 
     user, tasks, water_ml, sleep_minutes, diary_count = await _load_user_and_metrics(from_user, selected_date)
+    all_time_stats: dict[str, int] | None = None
     diary_entries: list = []
     if view_mode == VIEW_DIARY or current_state == DashboardStates.waiting_diary_text.state:
         async with async_session() as session:
@@ -492,6 +554,9 @@ async def _render(
     if current_state == DashboardStates.waiting_task_title.state:
         text = _build_tasks_text(tasks, selected_date, "wait_title", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_tasks_keyboard(tasks, selected_date)
+    elif current_state == DashboardStates.waiting_display_name.state:
+        text = _build_profile_text(user, mode="wait_name", notice=notice)
+        keyboard = _build_profile_keyboard(editing=True)
     elif current_state == DashboardStates.waiting_task_priority.state:
         text = _build_tasks_text(tasks, selected_date, "wait_priority", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_priority_keyboard()
@@ -508,8 +573,15 @@ async def _render(
         text = _build_calendar_text(selected_date, notice)
         keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="browse")
     elif view_mode == VIEW_STATS:
-        text = _build_stats_text(user, tasks, water_ml, sleep_minutes, selected_date, notice)
+        user, all_time_stats = await _load_user_all_time_stats(from_user)
+        text = _build_stats_text(user, all_time_stats, notice)
         keyboard = _build_stats_keyboard(selected_date)
+    elif view_mode == VIEW_PROFILE:
+        text = _build_profile_text(user, mode="main", notice=notice)
+        keyboard = _build_profile_keyboard(editing=False)
+    elif view_mode == VIEW_SETTINGS:
+        text = _build_settings_text(user, notice=notice)
+        keyboard = _build_settings_keyboard()
     elif view_mode == VIEW_HEALTH:
         text = _build_health_text(water_ml, selected_date, notice)
         keyboard = _build_health_keyboard(selected_date)

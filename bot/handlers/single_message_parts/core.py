@@ -1,13 +1,17 @@
 ﻿from __future__ import annotations
 
+import html
 from datetime import date
 
 from aiogram import F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from backend.database import async_session
+from backend.services.user_service import get_or_create_user, set_user_preferred_name
 from bot.states import DashboardStates
 
 from .common import (
@@ -19,14 +23,15 @@ from .common import (
     VIEW_CALENDAR,
     VIEW_HEALTH,
     VIEW_HOME,
+    VIEW_PROFILE,
+    VIEW_SETTINGS,
     VIEW_STATS,
     VIEW_TASKS,
-    _back_row,
     _build_companion_hint,
+    _display_name,
     _build_mana_bar,
     _build_meter,
     _clamp_percent,
-    _date_nav_row,
     _format_long_date,
     _month_start,
     _render,
@@ -53,13 +58,54 @@ def _home_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def _build_stats_keyboard(selected_date: date) -> InlineKeyboardMarkup:
+def _build_stats_keyboard(_selected_date: date) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[])
+
+
+def _build_settings_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            _date_nav_row(selected_date),
-            _back_row(),
+            [InlineKeyboardButton(text="👤 Профиль", callback_data="view:profile")],
         ]
     )
+
+
+def _build_settings_text(user, notice: str | None) -> str:
+    lines = [
+        "<b>⚙️ НАСТРОЙКИ</b>",
+        f"Текущее имя: <b>{html.escape(_display_name(user))}</b>",
+        "Здесь будут настройки профиля и будущие системные параметры.",
+    ]
+    if notice:
+        lines.extend(["", f"ℹ️ {notice}"])
+    return "\n".join(lines)
+
+
+def _build_profile_keyboard(*, editing: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if editing:
+        rows.append([InlineKeyboardButton(text="↩️ Отмена", callback_data="profile:cancel")])
+    else:
+        rows.append([InlineKeyboardButton(text="✏️ Сменить имя", callback_data="profile:edit")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _build_profile_text(user, mode: str, notice: str | None) -> str:
+    lines = [
+        "<b>👤 ПРОФИЛЬ</b>",
+        f"Имя в боте: <b>{html.escape(_display_name(user))}</b>",
+        f"Telegram: <b>{html.escape(user.first_name)}</b>",
+    ]
+    if user.username:
+        lines.append(f"Username: <b>@{html.escape(user.username)}</b>")
+    lines.append(f"С нами с: <b>{user.created_at.strftime('%d.%m.%Y')}</b>")
+
+    if mode == "wait_name":
+        lines.extend(["", "Напиши имя или ник, который бот должен использовать дальше."])
+
+    if notice:
+        lines.extend(["", f"ℹ️ {notice}"])
+    return "\n".join(lines)
 
 
 def _build_home_text(
@@ -87,7 +133,7 @@ def _build_home_text(
 
     lines = [
         f"📅 {date_prefix}: {_format_long_date(selected_date)}",
-        f"👤 {user.first_name} | Ур. {user.level} | ⭐ {user.exp}/{user.exp_to_next_level} EXP",
+        f"👤 {_display_name(user)} | Ур. {user.level} | ⭐ {user.exp}/{user.exp_to_next_level} EXP",
         f"📍 Локация: {HOME_LOCATION_NAME} | 🔥 Streak: {user.current_streak} дней",
         "",
         f"❤️ HP (Привычки): {hp_bar} [{hp_percent}%]",
@@ -108,18 +154,24 @@ def _build_home_text(
     return "\n".join(lines)
 
 
-def _build_stats_text(user, tasks: list, water_ml: int, sleep_minutes: int, selected_date: date, notice: str | None) -> str:
-    done_count = sum(1 for t in tasks if t.is_done)
-    stamina_percent = _clamp_percent((sleep_minutes / 480) * 100)
+def _build_stats_text(user, stats: dict[str, int], notice: str | None) -> str:
+    tasks_total = stats["tasks_total"]
+    tasks_done = stats["tasks_done"]
+    sleep_total_minutes = stats["sleep_total_minutes"]
+    sleep_hours = sleep_total_minutes // 60
+    sleep_minutes_part = sleep_total_minutes % 60
+    completion_percent = _clamp_percent((tasks_done / tasks_total) * 100 if tasks_total else 0)
     lines = [
-        "<b>📈 СТАТИСТИКА</b>",
-        f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
-        f"👤 {user.first_name}",
+        "<b>📈 СТАТИСТИКА ЗА ВСЕ ВРЕМЯ</b>",
+        f"👤 {_display_name(user)}",
+        f"🗓 С нами с: <b>{user.created_at.strftime('%d.%m.%Y')}</b>",
         f"⭐ Уровень: <b>{user.level}</b>",
         f"⚡ EXP: <b>{user.exp}/{user.exp_to_next_level}</b>",
-        f"✅ Задачи: <b>{done_count}/{len(tasks)}</b>",
-        f"💧 Вода: <b>{water_ml} мл</b>",
-        f"⚡️ Стамина: <b>{stamina_percent}%</b>",
+        f"🔥 Серия: <b>{user.current_streak}</b> | рекорд <b>{user.longest_streak}</b>",
+        f"✅ Задачи: <b>{tasks_done}/{tasks_total}</b> [{completion_percent}%]",
+        f"💧 Вода: <b>{stats['water_total_ml']} мл</b>",
+        f"😴 Сон: <b>{sleep_hours} ч {sleep_minutes_part} м</b>",
+        f"📝 Дневник: <b>{stats['diary_total']}</b> записей",
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])
@@ -128,11 +180,45 @@ def _build_stats_text(user, tasks: list, water_ml: int, sleep_minutes: int, sele
 
 async def _render_command_view(message: Message, state: FSMContext, view_mode: str, notice: str | None = None) -> None:
     await _reset_context(state, view_mode=view_mode)
-    await _setup_chat_ui(message)
+    await _setup_chat_ui(message, force_keyboard=True)
     await _render(from_user=message.from_user, state=state, message=message, notice=notice)
 
 
+async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> bool:
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+
+    if user.preferred_name:
+        return False
+
+    await state.clear()
+    today = date.today()
+    await state.update_data(
+        selected_date=today.isoformat(),
+        calendar_month=_month_start(today).isoformat(),
+        view_mode=VIEW_PROFILE,
+        name_origin_view=VIEW_PROFILE,
+    )
+    await state.set_state(DashboardStates.waiting_display_name)
+    await _setup_chat_ui(message, force_keyboard=True, keyboard_text="Как тебя называть?")
+    await _render(
+        from_user=message.from_user,
+        state=state,
+        message=message,
+        notice="Напиши имя или ник, который бот будет использовать дальше.",
+    )
+    return True
+
+
 def _resolve_cancel_view(raw_state: str | None) -> str:
+    if raw_state == DashboardStates.waiting_display_name.state:
+        return VIEW_PROFILE
     if raw_state in {
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_task_priority.state,
@@ -147,6 +233,8 @@ def _resolve_cancel_view(raw_state: str | None) -> str:
 @router.message(Command("start"))
 @router.message(Command("dashboard"))
 async def cmd_start(message: Message, state: FSMContext) -> None:
+    if await _maybe_start_name_onboarding(message, state):
+        return
     await state.clear()
     today = date.today()
     await state.update_data(
@@ -154,19 +242,104 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         calendar_month=_month_start(today).isoformat(),
         view_mode=VIEW_HOME,
     )
-    await _setup_chat_ui(message)
+    await _setup_chat_ui(message, force_keyboard=True)
     await _render(from_user=message.from_user, state=state, message=message)
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, state: FSMContext) -> None:
-    await _setup_chat_ui(message)
+    await _setup_chat_ui(message, force_keyboard=True)
     await _render(
         from_user=message.from_user,
         state=state,
         message=message,
         notice="Нижняя кнопка чата открывает Web App. Разделы вынесены в быстрые кнопки у поля ввода.",
     )
+
+
+@router.message(StateFilter(DashboardStates.waiting_display_name))
+async def msg_display_name(message: Message, state: FSMContext) -> None:
+    preferred_name = (message.text or "").strip()
+    if not preferred_name:
+        await _render(
+            from_user=message.from_user,
+            state=state,
+            message=message,
+            notice="Отправь текстом имя или ник, который использовать в боте.",
+        )
+        return
+
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+        await set_user_preferred_name(session, user, preferred_name)
+
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+    data = await state.get_data()
+    target_view = data.get("name_origin_view", VIEW_PROFILE)
+    await _reset_context(state, view_mode=target_view)
+    await _setup_chat_ui(message, force_keyboard=True)
+    await _render(
+        from_user=message.from_user,
+        state=state,
+        message=message,
+        notice=f"Буду обращаться: {html.escape(preferred_name)}",
+    )
+
+
+@router.callback_query(F.data == "view:profile")
+async def cb_view_profile(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    origin_view = data.get("view_mode", VIEW_HOME)
+    await _reset_context(state, view_mode=VIEW_PROFILE)
+    await state.update_data(profile_origin_view=origin_view)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "view:settings")
+async def cb_view_settings(callback: CallbackQuery, state: FSMContext) -> None:
+    await _reset_context(state, view_mode=VIEW_SETTINGS)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "profile:edit")
+async def cb_profile_edit(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    origin_view = data.get("profile_origin_view", VIEW_PROFILE)
+    selected_date, calendar_month, _ = await _reset_context(state, view_mode=VIEW_PROFILE)
+    await state.set_state(DashboardStates.waiting_display_name)
+    await state.update_data(
+        selected_date=selected_date.isoformat(),
+        calendar_month=calendar_month.isoformat(),
+        view_mode=VIEW_PROFILE,
+        profile_origin_view=origin_view,
+        name_origin_view=origin_view,
+    )
+    await _render(
+        from_user=callback.from_user,
+        state=state,
+        callback=callback,
+        notice="Напиши новое имя или ник.",
+    )
+    await callback.answer("Жду имя")
+
+
+@router.callback_query(F.data == "profile:cancel")
+async def cb_profile_cancel(callback: CallbackQuery, state: FSMContext) -> None:
+    await _reset_context(state, view_mode=VIEW_PROFILE)
+    await _render(from_user=callback.from_user, state=state, callback=callback, notice="Изменение имени отменено")
+    await callback.answer()
 
 
 @router.message(Command("home"))
@@ -209,7 +382,7 @@ async def cmd_today(message: Message, state: FSMContext) -> None:
         selected_date=today.isoformat(),
         calendar_month=_month_start(today).isoformat(),
     )
-    await _setup_chat_ui(message)
+    await _setup_chat_ui(message, force_keyboard=True)
     await _render(
         from_user=message.from_user,
         state=state,
@@ -268,6 +441,7 @@ async def cb_view_health(callback: CallbackQuery, state: FSMContext) -> None:
 @router.message()
 async def fallback(message: Message, state: FSMContext) -> None:
     if await state.get_state() not in {
+        DashboardStates.waiting_display_name.state,
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_diary_text.state,
     }:

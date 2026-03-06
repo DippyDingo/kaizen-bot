@@ -13,6 +13,7 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
     username: Mapped[str | None] = mapped_column(String(50), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    preferred_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Moscow", nullable=False)
 
@@ -37,4 +38,4 @@ class User(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<User {self.first_name} (tg_id={self.telegram_id}, level={self.level})>"
+        return f"<User {self.preferred_name or self.first_name} (tg_id={self.telegram_id}, level={self.level})>"

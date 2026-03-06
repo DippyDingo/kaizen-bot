@@ -54,6 +54,13 @@ async def get_day_diary_entries_count(session: AsyncSession, user_id: int, targe
     return int(result.scalar_one())
 
 
+async def get_total_diary_entries_count(session: AsyncSession, user_id: int) -> int:
+    result = await session.execute(
+        select(func.count(DiaryEntry.id)).where(DiaryEntry.user_id == user_id)
+    )
+    return int(result.scalar_one())
+
+
 async def list_day_diary_entries(
     session: AsyncSession,
     user_id: int,

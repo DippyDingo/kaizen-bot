@@ -1,6 +1,6 @@
 ﻿from datetime import date, datetime
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Task, User
@@ -27,12 +27,29 @@ async def create_task(
 
 
 async def list_tasks_for_date(session: AsyncSession, user_id: int, task_date: date) -> list[Task]:
+    priority_order = case(
+        (Task.priority == "high", 0),
+        (Task.priority == "medium", 1),
+        (Task.priority == "low", 2),
+        else_=3,
+    )
     result = await session.execute(
         select(Task)
         .where(and_(Task.user_id == user_id, Task.task_date == task_date))
-        .order_by(Task.is_done.asc(), Task.id.asc())
+        .order_by(Task.is_done.asc(), priority_order.asc(), Task.id.asc())
     )
     return list(result.scalars().all())
+
+
+async def get_task_totals(session: AsyncSession, user_id: int) -> tuple[int, int]:
+    result = await session.execute(
+        select(
+            func.count(Task.id),
+            func.coalesce(func.sum(case((Task.is_done.is_(True), 1), else_=0)), 0),
+        ).where(Task.user_id == user_id)
+    )
+    total, done = result.one()
+    return int(total or 0), int(done or 0)
 
 
 async def toggle_task_done(

@@ -127,7 +127,7 @@
   - `📝 Дневник`
   - `📅 Календарь`
   - `📊 Статистика`
-  - `💧 Вода`
+  - `❤️ Здоровье`
 - Home inline keyboard now keeps only local quick actions:
   - add water,
   - undo water,
@@ -135,6 +135,63 @@
   - add diary entry.
 - The bot sends one short keyboard-carrier message (`🧭 Меню`) per chat to keep the `ReplyKeyboard` visible.
 - Presses on quick chat buttons are handled before FSM text input and the pressed text message is deleted, so navigation does not pollute the chat history.
+- Main section screens no longer duplicate global navigation with inline `back to menu` buttons.
+- Task list layout was changed to two rows per task:
+  - first row: task title,
+  - second row: `❌` delete button.
+- Task title buttons now use Telegram Bot API button styles:
+  - `danger` for incomplete tasks,
+  - `success` for completed tasks.
+- Tapping the task title button toggles task completion directly.
+- Task delete button is placed to the right of the task title in the same row.
+- Task title buttons now show the priority badge on the left (`🔴`, `🟡`, `🟢`).
+- Full task titles are duplicated in the task screen text block so long tasks remain readable even if the inline button is visually compressed by Telegram.
+- Daily task lists are now sorted by:
+  - incomplete before complete,
+  - then `high -> medium -> low` priority,
+  - then creation order.
+- Diary list buttons no longer show the eye icon in the label.
+
+## 2026-03-06 Reply Keyboard Recovery
+
+- Quick chat buttons now recover more reliably after bot restarts and explicit command entry points.
+- The bot now tracks the current keyboard-carrier message per chat and replaces the old one instead of piling up multiple `🧭 Меню` messages.
+- Dashboard callback rendering restores the chat quick buttons if the bot runtime was restarted and in-memory keyboard state was lost.
+
+## 2026-03-06 Profile Name And All-Time Stats
+
+- Added `preferred_name` to `users` and a new migration:
+  - `alembic/versions/20260306_000004_add_user_preferred_name.py`
+- On first `/start`, if `preferred_name` is missing, the bot now asks how to address the user and stores that name for future screens.
+- Added a separate profile screen with name display and manual rename action.
+- If the profile is opened from statistics, saving a new name now returns to the all-time statistics screen so the updated name is visible immediately there.
+- Added a separate `⚙️ Настройки` section in chat quick buttons and moved profile access there.
+- Statistics screen no longer acts as an entry point for profile/settings.
+- The keyboard-carrier message can now show a prompt text like `Как тебя называть?` instead of the generic `🧭 Меню`.
+- Home and stats screens now use `preferred_name` if it is set.
+- Statistics screen was switched from per-day to all-time aggregates:
+  - total tasks,
+  - completed tasks,
+  - total water,
+  - total sleep,
+  - total diary entries,
+  - current and longest streak,
+  - account start date.
+- Main home mana bar already remains interactive because home rendering always recalculates water total for the selected day after `water:*` actions.
 - Files updated:
   - `bot/handlers/single_message_parts/common.py`
   - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/tasks.py`
+  - `bot/handlers/single_message_parts/diary.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `bot/handlers/single_message_parts/calendar.py`
+
+## 2026-03-06 README Sync With Plan
+
+- `README.md` was rewritten against the actual repository state and cross-checked with `PLAN.md`.
+- The README now clearly separates:
+  - what is already implemented in code,
+  - what is only partially implemented,
+  - what still remains only in the long-term plan.
+- The README now includes the current bot navigation, all-time stats, profile/settings flow, current data model status, and the real project structure.
+- The README explicitly does not claim unfinished modules like Django/DRF API, full Web App, AI integrations, social/RPG systems, or advanced health features as completed.

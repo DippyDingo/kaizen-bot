@@ -13,9 +13,7 @@ from .common import (
     MONTH_NAMES,
     VIEW_CALENDAR,
     VIEW_DIARY,
-    VIEW_TASKS,
     WEEKDAY_LABELS,
-    _back_row,
     _month_start,
     _next_month,
     _parse_iso_date,
@@ -84,14 +82,10 @@ def _build_calendar_keyboard(month_date: date, selected_date: date, context: str
         )
     elif context == "browse":
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:browse")])
-        rows.append([InlineKeyboardButton(text="📋 Задачи", callback_data="cal:to_tasks")])
-        rows.append(_back_row())
     elif context == "diary":
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:diary")])
         rows.append([InlineKeyboardButton(text="📝 Записи", callback_data="cal:to_diary")])
         rows.append([InlineKeyboardButton(text="↩️ Дневник", callback_data="diary:close_calendar")])
-    else:
-        rows.append(_back_row())
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -224,15 +218,6 @@ async def cb_cal_pick(callback: CallbackQuery, state: FSMContext) -> None:
         return
 
     await callback.answer("Ошибка")
-
-
-@router.callback_query(F.data == "cal:to_tasks")
-async def cb_cal_to_tasks(callback: CallbackQuery, state: FSMContext) -> None:
-    await state.update_data(view_mode=VIEW_TASKS, diary_calendar_mode=False)
-    await _render(from_user=callback.from_user, state=state, callback=callback)
-    await callback.answer()
-
-
 @router.callback_query(F.data == "cal:to_diary")
 async def cb_cal_to_diary(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(view_mode=VIEW_DIARY, diary_calendar_mode=False)

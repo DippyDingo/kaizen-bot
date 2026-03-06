@@ -19,6 +19,12 @@ async def get_or_create_user(
 ) -> tuple[User, bool]:
     user = await get_user_by_telegram_id(session, telegram_id)
     if user:
+        user.first_name = first_name
+        user.username = username
+        user.last_name = last_name
+        user.timezone = timezone
+        await session.commit()
+        await session.refresh(user)
         return user, False
 
     user = User(
@@ -32,3 +38,10 @@ async def get_or_create_user(
     await session.commit()
     await session.refresh(user)
     return user, True
+
+
+async def set_user_preferred_name(session: AsyncSession, user: User, preferred_name: str | None) -> User:
+    user.preferred_name = (preferred_name or "").strip() or None
+    await session.commit()
+    await session.refresh(user)
+    return user

@@ -2,6 +2,7 @@
 
 
 class DashboardStates(StatesGroup):
+    waiting_display_name = State()
     waiting_task_title = State()
     waiting_task_priority = State()
     waiting_task_date = State()

@@ -14,7 +14,6 @@ from bot.states import DashboardStates
 
 from .common import (
     VIEW_DIARY,
-    _back_row,
     _build_diary_entry_preview,
     _clear_output_messages,
     _date_nav_row,
@@ -48,13 +47,12 @@ def _build_diary_keyboard(selected_date: date, entries: list) -> InlineKeyboardM
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"👁 {entry.created_at.strftime('%H:%M')} {label}",
+                    text=f"{entry.created_at.strftime('%H:%M')} {label}",
                     callback_data=f"diary:view:{entry.id}",
                 )
             ]
         )
 
-    rows.append(_back_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -78,7 +76,7 @@ def _build_diary_text(
         lines.extend(
             [
                 "",
-                "➕ добавить, 👁 открыть, 📤 показать день, 🧹 очистить чат.",
+                "➕ добавить, открыть запись, 📤 показать день, 🧹 очистить чат.",
             ]
         )
 
