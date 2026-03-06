@@ -584,3 +584,20 @@
 - Validation after refactor:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Calendar And Diary Refactor
+
+- Split `bot/handlers/single_message_parts/calendar.py` into `bot/handlers/single_message_parts/calendar_parts/`:
+  - `builders.py`
+  - `handlers.py`
+- Split `bot/handlers/single_message_parts/diary.py` into `bot/handlers/single_message_parts/diary_parts/`:
+  - `builders.py`
+  - `handlers.py`
+- `calendar.py` and `diary.py` are now thin compatibility wrappers that preserve the existing builder imports used by the shared dashboard renderer while loading Telegram handler registrations for router side effects.
+- The goal of this refactor was structural only:
+  - make the UI layer consistent with `health_parts`, `common_parts`, and `core_parts`,
+  - separate text/keyboard builders from callback and message handlers,
+  - keep public imports stable.
+- Validation after refactor:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
