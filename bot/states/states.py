@@ -7,3 +7,4 @@ class DashboardStates(StatesGroup):
     waiting_task_priority = State()
     waiting_task_date = State()
     waiting_diary_text = State()
+    waiting_sleep_exact_time = State()

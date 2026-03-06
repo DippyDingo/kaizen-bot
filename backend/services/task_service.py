@@ -52,6 +52,61 @@ async def get_task_totals(session: AsyncSession, user_id: int) -> tuple[int, int
     return int(total or 0), int(done or 0)
 
 
+async def get_task_totals_for_period(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> tuple[int, int]:
+    result = await session.execute(
+        select(
+            func.count(Task.id),
+            func.coalesce(func.sum(case((Task.is_done.is_(True), 1), else_=0)), 0),
+        ).where(
+            and_(
+                Task.user_id == user_id,
+                Task.task_date >= date_from,
+                Task.task_date <= date_to,
+            )
+        )
+    )
+    total, done = result.one()
+    return int(total or 0), int(done or 0)
+
+
+async def get_task_details_for_period(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> dict[str, int]:
+    result = await session.execute(
+        select(
+            func.count(Task.id),
+            func.coalesce(func.sum(case((Task.is_done.is_(True), 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Task.priority == "high", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Task.priority == "medium", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Task.priority == "low", 1), else_=0)), 0),
+            func.count(func.distinct(Task.task_date)),
+        ).where(
+            and_(
+                Task.user_id == user_id,
+                Task.task_date >= date_from,
+                Task.task_date <= date_to,
+            )
+        )
+    )
+    total, done, high_count, medium_count, low_count, active_days = result.one()
+    return {
+        "total": int(total or 0),
+        "done": int(done or 0),
+        "high_count": int(high_count or 0),
+        "medium_count": int(medium_count or 0),
+        "low_count": int(low_count or 0),
+        "active_days": int(active_days or 0),
+    }
+
+
 async def toggle_task_done(
     session: AsyncSession,
     user: User,

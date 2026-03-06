@@ -61,6 +61,72 @@ async def get_total_diary_entries_count(session: AsyncSession, user_id: int) -> 
     return int(result.scalar_one())
 
 
+async def get_diary_entries_count_for_period(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> int:
+    start_dt = datetime.combine(date_from, datetime.min.time())
+    end_dt = datetime.combine(date_to, datetime.max.time())
+
+    result = await session.execute(
+        select(func.count(DiaryEntry.id)).where(
+            and_(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.created_at >= start_dt,
+                DiaryEntry.created_at <= end_dt,
+            )
+        )
+    )
+    return int(result.scalar_one())
+
+
+async def get_diary_details_for_period(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> dict[str, int]:
+    start_dt = datetime.combine(date_from, datetime.min.time())
+    end_dt = datetime.combine(date_to, datetime.max.time())
+
+    total_result = await session.execute(
+        select(
+            func.count(DiaryEntry.id),
+            func.count(func.distinct(func.date(DiaryEntry.created_at))),
+        ).where(
+            and_(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.created_at >= start_dt,
+                DiaryEntry.created_at <= end_dt,
+            )
+        )
+    )
+    total_entries, active_days = total_result.one()
+
+    best_day_result = await session.execute(
+        select(func.count(DiaryEntry.id).label("entries_count"))
+        .where(
+            and_(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.created_at >= start_dt,
+                DiaryEntry.created_at <= end_dt,
+            )
+        )
+        .group_by(func.date(DiaryEntry.created_at))
+        .order_by(func.count(DiaryEntry.id).desc())
+        .limit(1)
+    )
+    best_day_entries = best_day_result.scalar_one_or_none()
+
+    return {
+        "total_entries": int(total_entries or 0),
+        "active_days": int(active_days or 0),
+        "best_day_entries": int(best_day_entries or 0),
+    }
+
+
 async def list_day_diary_entries(
     session: AsyncSession,
     user_id: int,

@@ -195,3 +195,147 @@
   - what still remains only in the long-term plan.
 - The README now includes the current bot navigation, all-time stats, profile/settings flow, current data model status, and the real project structure.
 - The README explicitly does not claim unfinished modules like Django/DRF API, full Web App, AI integrations, social/RPG systems, or advanced health features as completed.
+
+## 2026-03-06 Health Sleep Flow
+
+- The `Здоровье` section was expanded from water-only UI to a minimal health dashboard with both water and sleep.
+- Health screen now shows:
+  - daily water total,
+  - daily sleep total,
+  - stamina percent based on sleep.
+- Added a button-driven sleep logging flow without free text:
+  - `😴 Добавить сон` -> choose duration -> choose quality 1-5.
+- Sleep logs are saved for the selected date as the wake-up date.
+- Added `↩️ Сон` to remove the last sleep log for the selected day.
+- Water actions now also reset the temporary health subflow state so the section returns to the main health screen cleanly after actions.
+- Added backend support for undoing the last sleep log:
+  - `remove_last_sleep_log(...)` in `backend/services/health_service.py`
+- Updated files:
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `bot/handlers/single_message_parts/common.py`
+
+## 2026-03-06 Exact Sleep Time Input
+
+- Added a separate `🕒 Точное время` entry point inside the sleep flow in `Здоровье`.
+- This button starts a dedicated exact-time mode instead of forcing users to use predefined duration buttons only.
+- In exact-time mode, the user sends sleep time in one message, for example:
+  - `23:40 07:15`
+  - `23:40-07:15`
+- The first time is interpreted as falling asleep, the second as wake-up time.
+- The selected dashboard date is treated as the wake-up date.
+- If the fall-asleep time is later than the wake-up time, the bot interprets falling asleep as the previous day.
+- After exact times are parsed, the bot does not assume sleep quality automatically; it sends the user to the same 1-5 quality selection step as the duration-based flow.
+- Added new FSM state:
+  - `DashboardStates.waiting_sleep_exact_time`
+- Updated files:
+  - `bot/states/states.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/health.py`
+
+## 2026-03-06 Stats Periods
+
+- The `Статистика` screen was expanded from all-time-only output to period-based analytics.
+- Added period switches in the stats UI:
+  - `День`
+  - `7 дней`
+  - `30 дней`
+  - `Всё время`
+- Stats periods are anchored to the currently selected dashboard date.
+- Added backend aggregation helpers for period ranges:
+  - tasks totals for a date range,
+  - water totals for a date range,
+  - sleep totals and average quality for a date range,
+  - diary entries count for a date range.
+- The stats screen now shows:
+  - task completion for the selected period,
+  - total and average water,
+  - total and average sleep,
+  - average sleep quality,
+  - diary entries count,
+  - level, EXP, streak and account start date.
+- Updated files:
+  - `backend/services/task_service.py`
+  - `backend/services/diary_service.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+
+## 2026-03-06 Detailed Stats
+
+- The stats screen was further expanded with more detailed breakdowns for tasks, health and diary activity.
+- Added detailed task analytics for the selected stats period:
+  - total tasks,
+  - completed tasks,
+  - priority split (`high/medium/low`),
+  - number of active task days.
+- Added detailed water analytics for the selected stats period:
+  - total water,
+  - active water days,
+  - best water day by ml.
+- Added detailed sleep analytics for the selected stats period:
+  - total sleep,
+  - average sleep,
+  - average sleep quality,
+  - active sleep days,
+  - best sleep day by total duration,
+  - longest single sleep log.
+- Added detailed diary analytics for the selected stats period:
+  - total entries,
+  - active diary days,
+  - best day by number of entries.
+- Updated files:
+  - `backend/services/task_service.py`
+  - `backend/services/diary_service.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+
+## 2026-03-06 Visual Stats And Health Summaries
+
+- The stats screen layout was rewritten into visual blocks instead of dense one-line metrics.
+- Stats are now grouped into separate readable sections:
+  - overall,
+  - tasks,
+  - water,
+  - sleep,
+  - diary.
+- The `Здоровье` section now has two separate summary screens:
+  - day summary,
+  - week summary.
+- Added health summary switches in the health UI:
+  - `День`
+  - `Неделя`
+- Day health summary focuses on the selected day:
+  - water,
+  - sleep,
+  - stamina,
+  - sleep quality.
+- Week health summary focuses on the 7-day window ending on the selected date:
+  - water total and average,
+  - active water days,
+  - best water day,
+  - sleep total and average,
+  - average sleep quality,
+  - active sleep days,
+  - best sleep day.
+- Updated files:
+  - `bot/handlers/single_message_parts/health.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+
+## 2026-03-06 Health Progress Bars
+
+- Added mini progress bars to the `Здоровье` summaries for both day and week views.
+- Progress bars now show:
+  - water progress,
+  - sleep progress.
+- The current implementation uses the same implicit targets that already existed in the bot UI:
+  - water: `2500 ml / day`
+  - sleep: `8 h / day`
+- Weekly bars are calculated against the corresponding 7-day targets.
+- Updated file:
+  - `bot/handlers/single_message_parts/health.py`

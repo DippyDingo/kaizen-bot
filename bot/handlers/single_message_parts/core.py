@@ -28,6 +28,7 @@ from .common import (
     VIEW_STATS,
     VIEW_TASKS,
     _build_companion_hint,
+    _date_nav_row,
     _display_name,
     _build_mana_bar,
     _build_meter,
@@ -39,6 +40,14 @@ from .common import (
     _setup_chat_ui,
     router,
 )
+
+
+STATS_PERIOD_LABELS = {
+    "day": "День",
+    "7d": "7 дней",
+    "30d": "30 дней",
+    "all": "Всё время",
+}
 
 
 def _home_keyboard() -> InlineKeyboardMarkup:
@@ -58,8 +67,35 @@ def _home_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def _build_stats_keyboard(_selected_date: date) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[])
+def _build_stats_keyboard(selected_date: date, stats_period: str) -> InlineKeyboardMarkup:
+    period_rows = [
+        [
+            InlineKeyboardButton(
+                text=f"• {STATS_PERIOD_LABELS['day']}" if stats_period == "day" else STATS_PERIOD_LABELS["day"],
+                callback_data="stats:period:day",
+            ),
+            InlineKeyboardButton(
+                text=f"• {STATS_PERIOD_LABELS['7d']}" if stats_period == "7d" else STATS_PERIOD_LABELS["7d"],
+                callback_data="stats:period:7d",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"• {STATS_PERIOD_LABELS['30d']}" if stats_period == "30d" else STATS_PERIOD_LABELS["30d"],
+                callback_data="stats:period:30d",
+            ),
+            InlineKeyboardButton(
+                text=f"• {STATS_PERIOD_LABELS['all']}" if stats_period == "all" else STATS_PERIOD_LABELS["all"],
+                callback_data="stats:period:all",
+            ),
+        ],
+    ]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            _date_nav_row(selected_date),
+            *period_rows,
+        ]
+    )
 
 
 def _build_settings_keyboard() -> InlineKeyboardMarkup:
@@ -154,28 +190,91 @@ def _build_home_text(
     return "\n".join(lines)
 
 
-def _build_stats_text(user, stats: dict[str, int], notice: str | None) -> str:
+def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: date, notice: str | None) -> str:
+    period = str(stats["period"])
     tasks_total = stats["tasks_total"]
     tasks_done = stats["tasks_done"]
     sleep_total_minutes = stats["sleep_total_minutes"]
     sleep_hours = sleep_total_minutes // 60
     sleep_minutes_part = sleep_total_minutes % 60
     completion_percent = _clamp_percent((tasks_done / tasks_total) * 100 if tasks_total else 0)
+    period_days = int(stats["period_days"])
+    water_total_ml = int(stats["water_total_ml"])
+    diary_total = int(stats["diary_total"])
+    avg_sleep_quality = float(stats["avg_sleep_quality"])
+    avg_water_ml = int(round(water_total_ml / period_days)) if period_days else 0
+    avg_sleep_minutes = int(round(sleep_total_minutes / period_days)) if period_days else 0
+    avg_sleep_hours = avg_sleep_minutes // 60
+    avg_sleep_minutes_part = avg_sleep_minutes % 60
+    task_details = stats["task_details"]
+    water_details = stats["water_details"]
+    sleep_details = stats["sleep_details"]
+    diary_details = stats["diary_details"]
+
+    if period == "all":
+        title = "📈 СТАТИСТИКА ЗА ВСЕ ВРЕМЯ"
+        period_line = f"Период: <b>с {user.created_at.strftime('%d.%m.%Y')}</b>"
+    elif period == "day":
+        title = "📈 СТАТИСТИКА ЗА ДЕНЬ"
+        period_line = f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>"
+    elif period == "7d":
+        title = "📈 СТАТИСТИКА ЗА 7 ДНЕЙ"
+        period_line = f"До даты: <b>{selected_date.strftime('%d.%m.%Y')}</b>"
+    else:
+        title = "📈 СТАТИСТИКА ЗА 30 ДНЕЙ"
+        period_line = f"До даты: <b>{selected_date.strftime('%d.%m.%Y')}</b>"
+
     lines = [
-        "<b>📈 СТАТИСТИКА ЗА ВСЕ ВРЕМЯ</b>",
+        f"<b>{title}</b>",
         f"👤 {_display_name(user)}",
-        f"🗓 С нами с: <b>{user.created_at.strftime('%d.%m.%Y')}</b>",
-        f"⭐ Уровень: <b>{user.level}</b>",
-        f"⚡ EXP: <b>{user.exp}/{user.exp_to_next_level}</b>",
-        f"🔥 Серия: <b>{user.current_streak}</b> | рекорд <b>{user.longest_streak}</b>",
-        f"✅ Задачи: <b>{tasks_done}/{tasks_total}</b> [{completion_percent}%]",
-        f"💧 Вода: <b>{stats['water_total_ml']} мл</b>",
-        f"😴 Сон: <b>{sleep_hours} ч {sleep_minutes_part} м</b>",
-        f"📝 Дневник: <b>{stats['diary_total']}</b> записей",
+        period_line,
+        "",
+        "<b>Общее</b>",
+        f"• ⭐ Уровень: <b>{user.level}</b>",
+        f"• ⚡ EXP: <b>{user.exp}/{user.exp_to_next_level}</b>",
+        f"• 🔥 Серия: <b>{user.current_streak}</b> | рекорд <b>{user.longest_streak}</b>",
+        f"• 🗓 С нами с: <b>{user.created_at.strftime('%d.%m.%Y')}</b>",
+        "",
+        "<b>Задачи</b>",
+        f"• Выполнено: <b>{tasks_done}/{tasks_total}</b> [{completion_percent}%]",
+        (
+            f"• Приоритеты: <b>🔴 {task_details['high_count']}</b> | "
+            f"<b>🟡 {task_details['medium_count']}</b> | <b>🟢 {task_details['low_count']}</b>"
+        ),
+        f"• Активных дней: <b>{task_details['active_days']}</b>",
+        "",
+        "<b>Вода</b>",
+        f"• Всего: <b>{water_total_ml} мл</b>",
+        f"• Среднее: <b>{avg_water_ml} мл/д</b>",
+        f"• Активных дней: <b>{water_details['active_days']}</b>",
+        f"• Лучший день: <b>{water_details['best_day_ml']} мл</b>",
+        "",
+        "<b>Сон</b>",
+        f"• Всего: <b>{sleep_hours} ч {sleep_minutes_part} м</b>",
+        f"• Среднее: <b>{avg_sleep_hours} ч {avg_sleep_minutes_part} м/д</b>",
+        f"• Качество: <b>{avg_sleep_quality:.1f}/5</b>" if avg_sleep_quality else "• Качество: <b>нет данных</b>",
+        f"• Активных дней: <b>{sleep_details['active_days']}</b>",
+        f"• Лучший день: <b>{_sleep_duration_text(int(sleep_details['best_day_minutes']))}</b>",
+        f"• Самый длинный сон: <b>{_sleep_duration_text(int(sleep_details['longest_log_minutes']))}</b>",
+        "",
+        "<b>Дневник</b>",
+        f"• Записей: <b>{diary_total}</b>",
+        f"• Активных дней: <b>{diary_details['active_days']}</b>",
+        f"• Лучший день: <b>{diary_details['best_day_entries']}</b> записей",
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])
     return "\n".join(lines)
+
+
+def _sleep_duration_text(minutes: int) -> str:
+    if minutes <= 0:
+        return "0 ч"
+    hours = minutes // 60
+    minutes_part = minutes % 60
+    if minutes_part == 0:
+        return f"{hours} ч"
+    return f"{hours} ч {minutes_part} м"
 
 
 async def _render_command_view(message: Message, state: FSMContext, view_mode: str, notice: str | None = None) -> None:
@@ -219,6 +318,8 @@ async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> b
 def _resolve_cancel_view(raw_state: str | None) -> str:
     if raw_state == DashboardStates.waiting_display_name.state:
         return VIEW_PROFILE
+    if raw_state == DashboardStates.waiting_sleep_exact_time.state:
+        return VIEW_HEALTH
     if raw_state in {
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_task_priority.state,
@@ -427,6 +528,7 @@ async def cb_view_calendar(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "view:stats")
 async def cb_view_stats(callback: CallbackQuery, state: FSMContext) -> None:
     await _reset_context(state, view_mode=VIEW_STATS)
+    await state.update_data(stats_period="all")
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()
 
@@ -438,10 +540,28 @@ async def cb_view_health(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("stats:period:"))
+async def cb_stats_period(callback: CallbackQuery, state: FSMContext) -> None:
+    try:
+        period = callback.data.split(":", 2)[2]
+    except IndexError:
+        await callback.answer("Ошибка")
+        return
+
+    if period not in STATS_PERIOD_LABELS:
+        await callback.answer("Ошибка")
+        return
+
+    await state.update_data(view_mode=VIEW_STATS, stats_period=period)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer("Период обновлен")
+
+
 @router.message()
 async def fallback(message: Message, state: FSMContext) -> None:
     if await state.get_state() not in {
         DashboardStates.waiting_display_name.state,
+        DashboardStates.waiting_sleep_exact_time.state,
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_diary_text.state,
     }:
@@ -454,5 +574,5 @@ async def fallback(message: Message, state: FSMContext) -> None:
         from_user=message.from_user,
         state=state,
         message=message,
-        notice="Управление кнопками. Текст нужен только для названия задачи.",
+        notice="Управление кнопками. Текст нужен только для названия задачи, имени или точного времени сна.",
     )
