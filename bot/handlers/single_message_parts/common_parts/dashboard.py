@@ -15,6 +15,7 @@ from bot.states import DashboardStates
 
 from .chat_ui import _ensure_chat_keyboard
 from .constants import (
+    CHAT_KEYBOARD_MESSAGES,
     CONFIGURED_REPLY_KEYBOARD_CHATS,
     DASHBOARD_MESSAGES,
     MAX_TRACKED_OUTPUT_MESSAGES,
@@ -30,6 +31,7 @@ from .constants import (
 )
 from .data import _load_health_summary, _load_user_and_metrics, _load_user_period_stats
 from .helpers import _month_start, _parse_iso_date
+from .telemetry import log_ui_event
 
 
 def _is_message_not_modified(exc: TelegramBadRequest) -> bool:
@@ -52,9 +54,17 @@ async def _persist_dashboard_ref(state: FSMContext, from_user, chat_id: int, mes
             chat_id=chat_id,
             message_id=message_id,
         )
+    log_ui_event(
+        "dashboard_ref_persisted",
+        chat_id=chat_id,
+        dashboard_message_id=message_id,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(chat_id),
+    )
 
 
 async def _clear_dashboard_ref(state: FSMContext, from_user) -> None:
+    data = await state.get_data()
+    chat_id = data.get("dashboard_chat_id")
     await state.update_data(dashboard_chat_id=None, dashboard_message_id=None)
     async with async_session() as session:
         user, _ = await get_or_create_user(
@@ -70,6 +80,11 @@ async def _clear_dashboard_ref(state: FSMContext, from_user) -> None:
             chat_id=None,
             message_id=None,
         )
+    log_ui_event(
+        "dashboard_ref_cleared",
+        chat_id=chat_id if isinstance(chat_id, int) else None,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(chat_id) if isinstance(chat_id, int) else None,
+    )
 
 
 async def _resolve_dashboard_target(message: Message, state: FSMContext) -> tuple[int, int] | None:
@@ -111,22 +126,52 @@ async def _relocate_dashboard_message(message: Message, state: FSMContext) -> No
 
     DASHBOARD_MESSAGES.pop(key, None)
     await _clear_dashboard_ref(state, message.from_user)
+    log_ui_event(
+        "dashboard_relocated",
+        chat_id=message.chat.id,
+        dashboard_message_id=target[1] if target else None,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(message.chat.id),
+    )
 
 
-async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMarkup) -> None:
+async def _edit_dashboard_callback(
+    callback: CallbackQuery,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
+    *,
+    view_mode: str | None = None,
+) -> None:
     key = (callback.message.chat.id, callback.from_user.id)
     DASHBOARD_MESSAGES[key] = (callback.message.chat.id, callback.message.message_id)
     if callback.message.chat.id not in CONFIGURED_REPLY_KEYBOARD_CHATS:
         await _ensure_chat_keyboard(callback.message)
     try:
         await callback.message.edit_text(text=text, reply_markup=keyboard)
+        log_ui_event(
+            "dashboard_callback_edit",
+            chat_id=callback.message.chat.id,
+            dashboard_message_id=callback.message.message_id,
+            carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(callback.message.chat.id),
+            view_mode=view_mode,
+            entrypoint="callback",
+        )
     except TelegramBadRequest as exc:
         if not _is_message_not_modified(exc):
             raise
+        log_ui_event(
+            "dashboard_callback_not_modified",
+            chat_id=callback.message.chat.id,
+            dashboard_message_id=callback.message.message_id,
+            carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(callback.message.chat.id),
+            view_mode=view_mode,
+            entrypoint="callback",
+        )
 
 
 async def _upsert_dashboard_message(message: Message, state: FSMContext, text: str, keyboard: InlineKeyboardMarkup) -> None:
     key = (message.chat.id, message.from_user.id)
+    data = await state.get_data()
+    view_mode = data.get("view_mode", VIEW_HOME)
     target = await _resolve_dashboard_target(message, state)
 
     if target:
@@ -140,16 +185,48 @@ async def _upsert_dashboard_message(message: Message, state: FSMContext, text: s
             )
             DASHBOARD_MESSAGES[key] = (chat_id, message_id)
             await state.update_data(dashboard_chat_id=chat_id, dashboard_message_id=message_id)
+            log_ui_event(
+                "dashboard_edit",
+                chat_id=chat_id,
+                dashboard_message_id=message_id,
+                carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(chat_id),
+                view_mode=view_mode,
+                entrypoint="message",
+            )
             return
         except TelegramBadRequest as exc:
             if _is_message_not_modified(exc):
                 DASHBOARD_MESSAGES[key] = (chat_id, message_id)
                 await state.update_data(dashboard_chat_id=chat_id, dashboard_message_id=message_id)
+                log_ui_event(
+                    "dashboard_not_modified",
+                    chat_id=chat_id,
+                    dashboard_message_id=message_id,
+                    carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(chat_id),
+                    view_mode=view_mode,
+                    entrypoint="message",
+                )
                 return
+            log_ui_event(
+                "dashboard_edit_recreate",
+                chat_id=chat_id,
+                dashboard_message_id=message_id,
+                carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(chat_id),
+                view_mode=view_mode,
+                entrypoint="message",
+            )
 
     sent = await message.answer(text=text, reply_markup=keyboard)
     DASHBOARD_MESSAGES[key] = (sent.chat.id, sent.message_id)
     await _persist_dashboard_ref(state, message.from_user, sent.chat.id, sent.message_id)
+    log_ui_event(
+        "dashboard_created",
+        chat_id=sent.chat.id,
+        dashboard_message_id=sent.message_id,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(sent.chat.id),
+        view_mode=view_mode,
+        entrypoint="message",
+    )
 
 
 async def _remember_output_message(state: FSMContext, bot_message: Message) -> None:
@@ -361,7 +438,7 @@ async def _render(
 
     if callback:
         await _persist_dashboard_ref(state, callback.from_user, callback.message.chat.id, callback.message.message_id)
-        await _edit_dashboard_callback(callback, text, keyboard)
+        await _edit_dashboard_callback(callback, text, keyboard, view_mode=view_mode)
     elif message:
         await _upsert_dashboard_message(message, state, text, keyboard)
 

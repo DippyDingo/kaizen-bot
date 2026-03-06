@@ -18,6 +18,7 @@ from backend.services.user_service import (
 )
 from bot.states import DashboardStates
 
+from ..common_parts.telemetry import log_ui_event
 from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_HOME, VIEW_PROFILE, VIEW_SETTINGS, VIEW_STATS, VIEW_TASKS, VIEW_WATER, _month_start, _relocate_dashboard_message, _render, _reset_chat_ui_state, _reset_context, _setup_chat_ui, router
 from .builders import STATS_PERIOD_LABELS, _maybe_start_name_onboarding, _render_command_view, _resolve_cancel_view
 
@@ -27,6 +28,12 @@ from .builders import STATS_PERIOD_LABELS, _maybe_start_name_onboarding, _render
 async def cmd_start(message: Message, state: FSMContext) -> None:
     if await _maybe_start_name_onboarding(message, state):
         return
+    log_ui_event(
+        "start_command",
+        chat_id=message.chat.id,
+        view_mode=VIEW_HOME,
+        entrypoint="start",
+    )
     _reset_chat_ui_state(message.chat.id)
     await state.clear()
     today = date.today()
@@ -354,7 +361,16 @@ async def cb_stats_period(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message()
 async def fallback(message: Message, state: FSMContext) -> None:
-    if await state.get_state() not in {
+    current_state = await state.get_state()
+    data = await state.get_data()
+    log_ui_event(
+        "fallback_render",
+        chat_id=message.chat.id,
+        dashboard_message_id=data.get("dashboard_message_id") if isinstance(data.get("dashboard_message_id"), int) else None,
+        view_mode=data.get("view_mode", VIEW_HOME),
+        entrypoint="fallback",
+    )
+    if current_state not in {
         DashboardStates.waiting_display_name.state,
         DashboardStates.waiting_water_amount_text.state,
         DashboardStates.waiting_sleep_exact_time.state,

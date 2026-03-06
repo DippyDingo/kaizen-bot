@@ -36,6 +36,7 @@ from .constants import (
     CONFIGURED_WEBAPP_CHATS,
     router,
 )
+from .telemetry import log_ui_event
 
 
 def _webapp_row() -> list[InlineKeyboardButton]:
@@ -66,6 +67,7 @@ def _reset_chat_ui_state(chat_id: int) -> None:
     CONFIGURED_REPLY_KEYBOARD_CHATS.discard(chat_id)
     CONFIGURED_WEBAPP_CHATS.discard(chat_id)
     CLEARED_COMMAND_CHATS.discard(chat_id)
+    log_ui_event("chat_ui_reset", chat_id=chat_id)
 
 
 async def _set_webapp_menu_button(message: Message) -> None:
@@ -79,6 +81,7 @@ async def _set_webapp_menu_button(message: Message) -> None:
             menu_button=MenuButtonWebApp(text="🌐 App", web_app=WebAppInfo(url=settings.webapp_url)),
         )
         CONFIGURED_WEBAPP_CHATS.add(chat_id)
+        log_ui_event("webapp_button_configured", chat_id=chat_id)
     except TelegramBadRequest:
         pass
 
@@ -114,14 +117,21 @@ async def _clear_chat_commands(message: Message) -> None:
             pass
 
     CLEARED_COMMAND_CHATS.add(chat_id)
+    log_ui_event("chat_commands_cleared", chat_id=chat_id)
 
 
 async def _ensure_chat_keyboard(message: Message, *, force: bool = False, text: str = "🧭 Меню") -> None:
     chat_id = message.chat.id
-    if not force and chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS:
+    existing_carrier_message_id = CHAT_KEYBOARD_MESSAGES.get(chat_id)
+    if not force and chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS and existing_carrier_message_id:
+        log_ui_event(
+            "carrier_reused",
+            chat_id=chat_id,
+            carrier_message_id=existing_carrier_message_id,
+        )
         return
 
-    previous_message_id = CHAT_KEYBOARD_MESSAGES.get(chat_id)
+    previous_message_id = existing_carrier_message_id
     sent = await message.answer(
         text,
         reply_markup=_chat_keyboard(),
@@ -129,6 +139,11 @@ async def _ensure_chat_keyboard(message: Message, *, force: bool = False, text: 
     )
     CHAT_KEYBOARD_MESSAGES[chat_id] = sent.message_id
     CONFIGURED_REPLY_KEYBOARD_CHATS.add(chat_id)
+    log_ui_event(
+        "carrier_created",
+        chat_id=chat_id,
+        carrier_message_id=sent.message_id,
+    )
 
     if previous_message_id and previous_message_id != sent.message_id:
         try:
@@ -141,6 +156,11 @@ async def _setup_chat_ui(message: Message, *, force_keyboard: bool = False, keyb
     await _clear_chat_commands(message)
     await _set_webapp_menu_button(message)
     await _ensure_chat_keyboard(message, force=force_keyboard, text=keyboard_text)
+    log_ui_event(
+        "chat_ui_setup",
+        chat_id=message.chat.id,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(message.chat.id),
+    )
 
 
 @router.message(F.text.in_(tuple(CHAT_NAVIGATION)))
@@ -148,6 +168,13 @@ async def msg_chat_navigation(message: Message, state: FSMContext) -> None:
     target_view = CHAT_NAVIGATION[(message.text or "").strip()]
     from ..core import _render_command_view
 
+    log_ui_event(
+        "navigation_request",
+        chat_id=message.chat.id,
+        carrier_message_id=CHAT_KEYBOARD_MESSAGES.get(message.chat.id),
+        view_mode=target_view,
+        entrypoint="chat_menu",
+    )
     await _render_command_view(
         message,
         state,
@@ -155,4 +182,5 @@ async def msg_chat_navigation(message: Message, state: FSMContext) -> None:
         delete_source_message=True,
         force_keyboard=False,
         relocate_dashboard=True,
+        entrypoint="chat_menu",
     )

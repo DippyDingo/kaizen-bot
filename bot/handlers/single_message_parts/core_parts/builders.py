@@ -11,6 +11,7 @@ from backend.database import async_session
 from backend.services.user_service import get_or_create_user
 from bot.states import DashboardStates
 
+from ..common_parts.telemetry import log_ui_event
 from ..common import (
     HOME_COMPANION_ROLE,
     HOME_DUEL_OPPONENT,
@@ -358,7 +359,14 @@ async def _render_command_view(
     delete_source_message: bool = False,
     force_keyboard: bool = True,
     relocate_dashboard: bool = False,
+    entrypoint: str = "command",
 ) -> None:
+    log_ui_event(
+        "render_command_view",
+        chat_id=message.chat.id,
+        view_mode=view_mode,
+        entrypoint=entrypoint,
+    )
     await _reset_context(state, view_mode=view_mode)
     await _setup_chat_ui(message, force_keyboard=force_keyboard)
     if relocate_dashboard:
@@ -384,6 +392,12 @@ async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> b
     if user.preferred_name:
         return False
 
+    log_ui_event(
+        "onboarding_start",
+        chat_id=message.chat.id,
+        view_mode=VIEW_PROFILE,
+        entrypoint="start",
+    )
     await state.clear()
     today = date.today()
     await state.update_data(

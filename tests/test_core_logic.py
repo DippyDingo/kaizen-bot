@@ -58,6 +58,7 @@ class ChatNavigationHandlerTests(unittest.IsolatedAsyncioTestCase):
             delete_source_message=True,
             force_keyboard=False,
             relocate_dashboard=True,
+            entrypoint="chat_menu",
         )
 
 

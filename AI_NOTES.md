@@ -803,3 +803,14 @@
 - Validation after the reset fix:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 22 tests.
+## 2026-03-07 Telegram UI Stabilization Sprint
+
+- Removed stale top-level chat navigation for the old water button and kept water as an internal health screen only.
+- Added structured Telegram UI lifecycle logging in `bot/handlers/single_message_parts/common_parts/telemetry.py`.
+- Logged events now cover chat UI reset/setup, carrier creation/reuse, dashboard ref persist/clear, dashboard relocation, callback edits, message edits, `/start`, onboarding start, and fallback render.
+- Hardened reply-keyboard recovery: `_ensure_chat_keyboard(...)` now recreates the carrier message if the chat is marked configured but the in-memory carrier id is missing.
+- Expanded regression coverage with `tests/test_chat_ui.py` and additional lifecycle tests in `tests/test_dashboard_rendering.py`.
+- README synced with the real codebase state, including migration `20260306_000009_add_dashboard_message_ref`, implemented medications, and reply-keyboard recovery limitations.
+- Validation after the stabilization pass:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 27 tests.
