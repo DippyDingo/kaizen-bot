@@ -339,3 +339,67 @@
 - Weekly bars are calculated against the corresponding 7-day targets.
 - Updated file:
   - `bot/handlers/single_message_parts/health.py`
+
+## 2026-03-06 Stats Progress Bars
+
+- Added compact visual progress bars to the `РЎС‚Р°С‚РёСЃС‚РёРєР°` screen.
+- Bars were added only for metrics with a clear scale:
+  - tasks completion,
+  - average water,
+  - average sleep,
+  - average sleep quality,
+  - diary activity by active days.
+- The current implementation uses these scales:
+  - tasks: completion percent for the selected period,
+  - water: average per day vs `2500 ml/day`,
+  - sleep: average per day vs `8 h/day`,
+  - sleep quality: current average vs `5/5`,
+  - diary: active days vs total days in the selected stats period.
+- Updated file:
+  - `bot/handlers/single_message_parts/core.py`
+## 2026-03-06 Unified Progress Bars
+
+- Unified the visual style of progress bars across `Главная`, `Здоровье` and `Статистика`.
+- Moved bar rendering to shared helpers in `bot/handlers/single_message_parts/common.py`.
+- Standardized the system to one scale:
+  - `5` segments per bar,
+  - `??` as the empty segment,
+  - fixed colors by metric: tasks `??`, water `??`, sleep `??`, diary `??`, sleep quality `??`.
+- Home screen no longer uses a separate red-empty HP bar; it now follows the same scale as the other screens.
+- Updated files:
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/health.py`
+## 2026-03-06 Unified Bar Captions
+
+- Standardized bar captions across `Главная`, `Здоровье` and `Статистика`.
+- Added a shared helper for the caption format `label: bar value`.
+- Removed mixed variants like `[60%]`, `Прогресс воды`, `Прогресс сна` and generic `Прогресс` where a direct metric label is clearer.
+- Updated files:
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/health.py`
+## 2026-03-06 Home Bar Alignment
+
+- Aligned the three main dashboard bars on the home screen into a single monospace block.
+- Implemented this through a shared helper in `bot/handlers/single_message_parts/common.py` instead of manual spacing in the screen builder.
+- The change is limited to the home status block so the rest of the UI keeps its regular text flow.
+- Updated files:
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+## 2026-03-06 Reverted Home Bar Alignment
+
+- Reverted the monospace alignment block for the home status bars.
+- Restored the regular inline caption format for `Привычки`, `Вода` and `Стамина` on the main screen.
+- Updated files:
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+## 2026-03-06 Shorter Home Bar Labels
+
+- Shortened the three home dashboard bar captions to make them visually more even without using monospace alignment.
+- Updated labels:
+  - `Привычки` -> `Ритм`
+  - `Стамина` -> `Сон`
+- Kept the existing inline text flow and the shared bar caption helper.
+- Updated file:
+  - `bot/handlers/single_message_parts/core.py`

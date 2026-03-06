@@ -143,6 +143,15 @@ HOME_TRACK_TITLE = "Naruto OST - Sadness and Sorrow"
 HOME_COMPANION_ROLE = "Мудрый наставник"
 
 WEBAPP_BUTTON_TEXT = "🌐 App"
+BAR_STEPS = 5
+BAR_EMPTY = "⬜️"
+BAR_FILLED: dict[str, str] = {
+    "tasks": "🟩",
+    "water": "🟦",
+    "sleep": "🟨",
+    "diary": "🟪",
+    "quality": "🟫",
+}
 
 
 def _short(text: str, limit: int = 22) -> str:
@@ -199,11 +208,32 @@ def _build_meter(percent: int, total: int, filled: str, empty: str) -> str:
     return (filled * filled_count) + (empty * (total - filled_count))
 
 
+def _build_metric_bar(metric: str, percent: int, total: int = BAR_STEPS) -> str:
+    filled = BAR_FILLED[metric]
+    return _build_meter(percent, total, filled, BAR_EMPTY)
+
+
+def _build_goal_bar(current: int, target: int, metric: str, total: int = BAR_STEPS) -> tuple[str, int]:
+    percent = _clamp_percent((current / target) * 100 if target > 0 else 0)
+    return _build_metric_bar(metric, percent, total=total), percent
+
+
+def _build_bar_caption(label: str, bar: str, value: str, *, icon: str | None = None) -> str:
+    prefix = f"{icon} " if icon else ""
+    return f"{prefix}{label}: {bar} <b>{value}</b>"
+
+
+def _build_step_bar(filled_steps: int, metric: str, total: int = BAR_STEPS) -> str:
+    safe_steps = max(0, min(total, filled_steps))
+    filled = BAR_FILLED[metric]
+    return (filled * safe_steps) + (BAR_EMPTY * (total - safe_steps))
+
+
 def _build_mana_bar(water_ml: int) -> tuple[str, int]:
-    max_steps = 5
+    max_steps = BAR_STEPS
     step_ml = 500
     mana_steps = max(0, min(max_steps, int(round(water_ml / step_ml))))
-    bar = ("🟦" * mana_steps) + ("⬜️" * (max_steps - mana_steps))
+    bar = _build_step_bar(mana_steps, "water", total=max_steps)
     return bar, mana_steps
 
 

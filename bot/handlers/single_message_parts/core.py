@@ -27,12 +27,14 @@ from .common import (
     VIEW_SETTINGS,
     VIEW_STATS,
     VIEW_TASKS,
+    _build_bar_caption,
+    _build_goal_bar,
     _build_companion_hint,
+    _build_metric_bar,
+    _build_mana_bar,
+    _clamp_percent,
     _date_nav_row,
     _display_name,
-    _build_mana_bar,
-    _build_meter,
-    _clamp_percent,
     _format_long_date,
     _month_start,
     _render,
@@ -48,6 +50,9 @@ STATS_PERIOD_LABELS = {
     "30d": "30 дней",
     "all": "Всё время",
 }
+
+STATS_WATER_TARGET_ML_PER_DAY = 2500
+STATS_SLEEP_TARGET_MIN_PER_DAY = 480
 
 
 def _home_keyboard() -> InlineKeyboardMarkup:
@@ -157,24 +162,23 @@ def _build_home_text(
     done_count = sum(1 for t in tasks if t.is_done)
 
     hp_percent = _clamp_percent((done_count / total_tasks) * 100 if total_tasks else 0)
-    hp_bar = _build_meter(hp_percent, 5, "🟩", "🟥")
+    hp_bar = _build_metric_bar("tasks", hp_percent)
 
     mana_bar, mana_steps = _build_mana_bar(water_ml)
 
     stamina_percent = _clamp_percent((sleep_minutes / 480) * 100)
-    stamina_bar = _build_meter(stamina_percent, 5, "🟨", "⬜️")
+    stamina_bar = _build_metric_bar("sleep", stamina_percent)
 
     companion_hint = _build_companion_hint(stamina_percent, water_ml, done_count, total_tasks)
     date_prefix = "Сегодня" if selected_date == date.today() else "Дата"
-
     lines = [
         f"📅 {date_prefix}: {_format_long_date(selected_date)}",
         f"👤 {_display_name(user)} | Ур. {user.level} | ⭐ {user.exp}/{user.exp_to_next_level} EXP",
         f"📍 Локация: {HOME_LOCATION_NAME} | 🔥 Streak: {user.current_streak} дней",
         "",
-        f"❤️ HP (Привычки): {hp_bar} [{hp_percent}%]",
-        f"💧 Мана (Вода): {mana_bar} [{mana_steps}/5]",
-        f"⚡️ Стамина (Сон/Спорт): {stamina_bar} [{stamina_percent}%]",
+        _build_bar_caption("Ритм", hp_bar, f"{hp_percent}%", icon="❤️"),
+        _build_bar_caption("Вода", mana_bar, f"{mana_steps}/5", icon="💧"),
+        _build_bar_caption("Сон", stamina_bar, f"{stamina_percent}%", icon="⚡️"),
         "",
         f"⚔️ Дуэль (Вода): Ты [{water_ml}мл] 🆚 {HOME_DUEL_OPPONENT} [{HOME_DUEL_OPPONENT_WATER_ML}мл]",
         f"🎵 Трек: {HOME_TRACK_TITLE}",
@@ -210,6 +214,13 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
     water_details = stats["water_details"]
     sleep_details = stats["sleep_details"]
     diary_details = stats["diary_details"]
+    task_bar = _build_metric_bar("tasks", completion_percent)
+    water_bar, water_percent = _build_goal_bar(avg_water_ml, STATS_WATER_TARGET_ML_PER_DAY, "water")
+    sleep_bar, sleep_percent = _build_goal_bar(avg_sleep_minutes, STATS_SLEEP_TARGET_MIN_PER_DAY, "sleep")
+    diary_active_percent = _clamp_percent((int(diary_details["active_days"]) / period_days) * 100 if period_days else 0)
+    diary_bar = _build_metric_bar("diary", diary_active_percent)
+    sleep_quality_percent = _clamp_percent((avg_sleep_quality / 5) * 100 if avg_sleep_quality else 0)
+    sleep_quality_bar = _build_metric_bar("quality", sleep_quality_percent)
 
     if period == "all":
         title = "📈 СТАТИСТИКА ЗА ВСЕ ВРЕМЯ"
@@ -237,6 +248,7 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
         "",
         "<b>Задачи</b>",
         f"• Выполнено: <b>{tasks_done}/{tasks_total}</b> [{completion_percent}%]",
+        f"• {_build_bar_caption('Выполнение', task_bar, f'{completion_percent}%')}",
         (
             f"• Приоритеты: <b>🔴 {task_details['high_count']}</b> | "
             f"<b>🟡 {task_details['medium_count']}</b> | <b>🟢 {task_details['low_count']}</b>"
@@ -246,19 +258,23 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
         "<b>Вода</b>",
         f"• Всего: <b>{water_total_ml} мл</b>",
         f"• Среднее: <b>{avg_water_ml} мл/д</b>",
+        f"• {_build_bar_caption('Цель воды', water_bar, f'{water_percent}%')}",
         f"• Активных дней: <b>{water_details['active_days']}</b>",
         f"• Лучший день: <b>{water_details['best_day_ml']} мл</b>",
         "",
         "<b>Сон</b>",
         f"• Всего: <b>{sleep_hours} ч {sleep_minutes_part} м</b>",
         f"• Среднее: <b>{avg_sleep_hours} ч {avg_sleep_minutes_part} м/д</b>",
+        f"• {_build_bar_caption('Цель сна', sleep_bar, f'{sleep_percent}%')}",
         f"• Качество: <b>{avg_sleep_quality:.1f}/5</b>" if avg_sleep_quality else "• Качество: <b>нет данных</b>",
+        f"• {_build_bar_caption('Качество', sleep_quality_bar, f'{sleep_quality_percent}%')}" if avg_sleep_quality else f"• {_build_bar_caption('Качество', _build_metric_bar('quality', 0), '0%')}",
         f"• Активных дней: <b>{sleep_details['active_days']}</b>",
         f"• Лучший день: <b>{_sleep_duration_text(int(sleep_details['best_day_minutes']))}</b>",
         f"• Самый длинный сон: <b>{_sleep_duration_text(int(sleep_details['longest_log_minutes']))}</b>",
         "",
         "<b>Дневник</b>",
         f"• Записей: <b>{diary_total}</b>",
+        f"• {_build_bar_caption('Активность', diary_bar, f'{diary_active_percent}%')}",
         f"• Активных дней: <b>{diary_details['active_days']}</b>",
         f"• Лучший день: <b>{diary_details['best_day_entries']}</b> записей",
     ]

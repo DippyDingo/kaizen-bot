@@ -14,7 +14,7 @@ from backend.services.health_service import add_sleep_log, add_water_log, remove
 from backend.services.user_service import get_or_create_user
 from bot.states import DashboardStates
 
-from .common import VIEW_HEALTH, _build_meter, _clamp_percent, _date_nav_row, _parse_iso_date, _render, router
+from .common import VIEW_HEALTH, _build_bar_caption, _build_goal_bar, _clamp_percent, _date_nav_row, _parse_iso_date, _render, router
 
 
 HEALTH_MODE_SUMMARY_DAY = "summary_day"
@@ -50,11 +50,6 @@ def _sleep_duration_label(minutes: int) -> str:
     if minutes_part == 0:
         return f"{hours}ч"
     return f"{hours}ч {minutes_part}м"
-
-
-def _progress_bar(current: int, target: int, filled: str, empty: str) -> tuple[str, int]:
-    percent = _clamp_percent((current / target) * 100 if target > 0 else 0)
-    return _build_meter(percent, 5, filled, empty), percent
 
 
 def _build_health_keyboard(
@@ -139,12 +134,12 @@ def _build_health_text(
 ) -> str:
     stamina_percent = _clamp_percent((sleep_minutes / 480) * 100)
     summary = summary or {}
-    day_water_bar, day_water_percent = _progress_bar(water_ml, DAILY_WATER_TARGET_ML, "🟦", "⬜️")
-    day_sleep_bar, day_sleep_percent = _progress_bar(sleep_minutes, DAILY_SLEEP_TARGET_MIN, "🟨", "⬜️")
+    day_water_bar, day_water_percent = _build_goal_bar(water_ml, DAILY_WATER_TARGET_ML, "water")
+    day_sleep_bar, day_sleep_percent = _build_goal_bar(sleep_minutes, DAILY_SLEEP_TARGET_MIN, "sleep")
     week_water_total = int(summary.get("week_water_total", 0))
     week_sleep_total = int(summary.get("week_sleep_total", 0))
-    week_water_bar, week_water_percent = _progress_bar(week_water_total, DAILY_WATER_TARGET_ML * 7, "🟦", "⬜️")
-    week_sleep_bar, week_sleep_percent = _progress_bar(week_sleep_total, DAILY_SLEEP_TARGET_MIN * 7, "🟨", "⬜️")
+    week_water_bar, week_water_percent = _build_goal_bar(week_water_total, DAILY_WATER_TARGET_ML * 7, "water")
+    week_sleep_bar, week_sleep_percent = _build_goal_bar(week_sleep_total, DAILY_SLEEP_TARGET_MIN * 7, "sleep")
 
     lines: list[str]
     if mode == HEALTH_MODE_SUMMARY_WEEK:
@@ -154,14 +149,14 @@ def _build_health_text(
             "",
             "<b>💧 Вода</b>",
             f"• Сумма: <b>{summary.get('week_water_total', 0)} мл</b>",
-            f"• Прогресс: {week_water_bar} <b>{week_water_percent}%</b>",
+            f"• {_build_bar_caption('Вода', week_water_bar, f'{week_water_percent}%')}",
             f"• Среднее: <b>{summary.get('week_water_avg', 0)} мл/д</b>",
             f"• Активных дней: <b>{summary.get('week_water_active_days', 0)}/7</b>",
             f"• Лучший день: <b>{summary.get('week_best_water_day', 0)} мл</b>",
             "",
             "<b>😴 Сон</b>",
             f"• Сумма: <b>{_format_minutes(int(summary.get('week_sleep_total', 0)))}</b>",
-            f"• Прогресс: {week_sleep_bar} <b>{week_sleep_percent}%</b>",
+            f"• {_build_bar_caption('Сон', week_sleep_bar, f'{week_sleep_percent}%')}",
             f"• Среднее: <b>{_format_minutes(int(summary.get('week_sleep_avg', 0)))}/д</b>",
             (
                 f"• Качество: <b>{float(summary.get('week_avg_quality', 0)):.1f}/5</b>"
@@ -179,9 +174,9 @@ def _build_health_text(
             "",
             "<b>Сегодня</b>",
             f"• 💧 Вода: <b>{water_ml} мл</b>",
-            f"• Прогресс воды: {day_water_bar} <b>{day_water_percent}%</b>",
+            f"• {_build_bar_caption('Вода', day_water_bar, f'{day_water_percent}%')}",
             f"• 😴 Сон: <b>{_format_minutes(sleep_minutes)}</b>",
-            f"• Прогресс сна: {day_sleep_bar} <b>{day_sleep_percent}%</b>",
+            f"• {_build_bar_caption('Сон', day_sleep_bar, f'{day_sleep_percent}%')}",
             f"• ⚡ Стамина: <b>{stamina_percent}%</b>",
             (
                 f"• ⭐ Качество сна: <b>{day_quality:.1f}/5</b>"
