@@ -118,3 +118,23 @@
 - Files updated for these fixes:
   - `bot/handlers/single_message_parts/common.py`
   - `bot/main.py`
+
+## 2026-03-06 Chat Quick Buttons
+
+- Global navigation was moved from the home inline keyboard into Telegram quick chat buttons (`ReplyKeyboard`):
+  - `🏠 Главная`
+  - `📋 Задачи`
+  - `📝 Дневник`
+  - `📅 Календарь`
+  - `📊 Статистика`
+  - `💧 Вода`
+- Home inline keyboard now keeps only local quick actions:
+  - add water,
+  - undo water,
+  - add task,
+  - add diary entry.
+- The bot sends one short keyboard-carrier message (`🧭 Меню`) per chat to keep the `ReplyKeyboard` visible.
+- Presses on quick chat buttons are handled before FSM text input and the pressed text message is deleted, so navigation does not pollute the chat history.
+- Files updated:
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`

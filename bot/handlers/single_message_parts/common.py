@@ -17,8 +17,10 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
     MenuButtonWebApp,
     Message,
+    ReplyKeyboardMarkup,
     WebAppInfo,
 )
 
@@ -40,6 +42,7 @@ DashboardMessageRef = tuple[int, int]
 DASHBOARD_MESSAGES: dict[DashboardKey, DashboardMessageRef] = {}
 CONFIGURED_WEBAPP_CHATS: set[int] = set()
 CLEARED_COMMAND_CHATS: set[int] = set()
+CONFIGURED_REPLY_KEYBOARD_CHATS: set[int] = set()
 MAX_TRACKED_OUTPUT_MESSAGES = 80
 
 VIEW_HOME = "home"
@@ -48,6 +51,22 @@ VIEW_CALENDAR = "calendar"
 VIEW_STATS = "stats"
 VIEW_HEALTH = "health"
 VIEW_DIARY = "diary"
+
+CHAT_BUTTON_HOME = "🏠 Главная"
+CHAT_BUTTON_TASKS = "📋 Задачи"
+CHAT_BUTTON_DIARY = "📝 Дневник"
+CHAT_BUTTON_CALENDAR = "📅 Календарь"
+CHAT_BUTTON_STATS = "📊 Статистика"
+CHAT_BUTTON_HEALTH = "💧 Вода"
+
+CHAT_NAVIGATION: dict[str, str] = {
+    CHAT_BUTTON_HOME: VIEW_HOME,
+    CHAT_BUTTON_TASKS: VIEW_TASKS,
+    CHAT_BUTTON_DIARY: VIEW_DIARY,
+    CHAT_BUTTON_CALENDAR: VIEW_CALENDAR,
+    CHAT_BUTTON_STATS: VIEW_STATS,
+    CHAT_BUTTON_HEALTH: VIEW_HEALTH,
+}
 
 PRIORITY_TEXT: dict[str, str] = {
     "high": "🔴 Важно",
@@ -259,6 +278,19 @@ def _webapp_row() -> list[InlineKeyboardButton]:
     ]
 
 
+def _chat_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=CHAT_BUTTON_HOME), KeyboardButton(text=CHAT_BUTTON_TASKS)],
+            [KeyboardButton(text=CHAT_BUTTON_DIARY), KeyboardButton(text=CHAT_BUTTON_CALENDAR)],
+            [KeyboardButton(text=CHAT_BUTTON_STATS), KeyboardButton(text=CHAT_BUTTON_HEALTH)],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+        input_field_placeholder="Выбери раздел",
+    )
+
+
 async def _set_webapp_menu_button(message: Message) -> None:
     chat_id = message.chat.id
     if chat_id in CONFIGURED_WEBAPP_CHATS:
@@ -307,9 +339,35 @@ async def _clear_chat_commands(message: Message) -> None:
     CLEARED_COMMAND_CHATS.add(chat_id)
 
 
+async def _ensure_chat_keyboard(message: Message) -> None:
+    chat_id = message.chat.id
+    if chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS:
+        return
+
+    await message.answer(
+        "🧭 Меню",
+        reply_markup=_chat_keyboard(),
+        disable_notification=True,
+    )
+    CONFIGURED_REPLY_KEYBOARD_CHATS.add(chat_id)
+
+
 async def _setup_chat_ui(message: Message) -> None:
     await _clear_chat_commands(message)
     await _set_webapp_menu_button(message)
+    await _ensure_chat_keyboard(message)
+
+
+@router.message(F.text.in_(tuple(CHAT_NAVIGATION)))
+async def msg_chat_navigation(message: Message, state: FSMContext) -> None:
+    target_view = CHAT_NAVIGATION[(message.text or "").strip()]
+    await _reset_context(state, view_mode=target_view)
+    await _setup_chat_ui(message)
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+    await _render(from_user=message.from_user, state=state, message=message)
 
 
 async def _load_user_and_metrics(from_user, target_date: date) -> tuple[object, list, int, int, int]:

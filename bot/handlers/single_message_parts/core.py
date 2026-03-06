@@ -49,15 +49,6 @@ def _home_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="➕ Задача", callback_data="task:add"),
                 InlineKeyboardButton(text="➕ Запись", callback_data="diary:add"),
             ],
-            [
-                InlineKeyboardButton(text="📋 Задачи", callback_data="view:tasks"),
-                InlineKeyboardButton(text="📝 Дневник", callback_data="view:diary"),
-            ],
-            [
-                InlineKeyboardButton(text="📅 Календарь", callback_data="view:calendar"),
-                InlineKeyboardButton(text="📊 Статистика", callback_data="view:stats"),
-            ],
-            [InlineKeyboardButton(text="💧 Вода", callback_data="view:health")],
         ]
     )
 
@@ -174,7 +165,7 @@ async def cmd_help(message: Message, state: FSMContext) -> None:
         from_user=message.from_user,
         state=state,
         message=message,
-        notice="Нижняя кнопка чата открывает Web App. Разделы и быстрые действия находятся в главном сообщении.",
+        notice="Нижняя кнопка чата открывает Web App. Разделы вынесены в быстрые кнопки у поля ввода.",
     )
 
 
