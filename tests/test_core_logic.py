@@ -71,12 +71,14 @@ class StartHandlerTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("bot.handlers.single_message_parts.core_parts.handlers._maybe_start_name_onboarding", new=AsyncMock(return_value=False)),
+            patch("bot.handlers.single_message_parts.core_parts.handlers._reset_chat_ui_state") as reset_chat_ui_state,
             patch("bot.handlers.single_message_parts.core_parts.handlers._setup_chat_ui", new=AsyncMock()) as setup_ui,
             patch("bot.handlers.single_message_parts.core_parts.handlers._relocate_dashboard_message", new=AsyncMock()) as relocate_dashboard,
             patch("bot.handlers.single_message_parts.core_parts.handlers._render", new=AsyncMock()) as render,
         ):
             await cmd_start(message, state)
 
+        reset_chat_ui_state.assert_called_once_with(message.chat.id)
         setup_ui.assert_awaited_once_with(message, force_keyboard=True)
         relocate_dashboard.assert_awaited_once_with(message, state)
         render.assert_awaited_once()

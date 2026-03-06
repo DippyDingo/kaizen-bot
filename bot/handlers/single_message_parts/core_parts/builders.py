@@ -36,6 +36,7 @@ from ..common import (
     _month_start,
     _relocate_dashboard_message,
     _render,
+    _reset_chat_ui_state,
     _reset_context,
     _setup_chat_ui,
 )
@@ -392,6 +393,7 @@ async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> b
         name_origin_view=VIEW_PROFILE,
     )
     await state.set_state(DashboardStates.waiting_display_name)
+    _reset_chat_ui_state(message.chat.id)
     await _setup_chat_ui(message, force_keyboard=True, keyboard_text="Как тебя называть?")
     await _relocate_dashboard_message(message, state)
     await _render(

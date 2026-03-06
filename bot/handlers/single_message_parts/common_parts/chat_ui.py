@@ -61,6 +61,13 @@ def _chat_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def _reset_chat_ui_state(chat_id: int) -> None:
+    CHAT_KEYBOARD_MESSAGES.pop(chat_id, None)
+    CONFIGURED_REPLY_KEYBOARD_CHATS.discard(chat_id)
+    CONFIGURED_WEBAPP_CHATS.discard(chat_id)
+    CLEARED_COMMAND_CHATS.discard(chat_id)
+
+
 async def _set_webapp_menu_button(message: Message) -> None:
     chat_id = message.chat.id
     if chat_id in CONFIGURED_WEBAPP_CHATS:

@@ -2,6 +2,7 @@
     _chat_keyboard,
     _clear_chat_commands,
     _ensure_chat_keyboard,
+    _reset_chat_ui_state,
     _set_webapp_menu_button,
     _setup_chat_ui,
     _webapp_row,
@@ -88,3 +89,4 @@ from .common_parts.helpers import (
     _prev_month,
     _short,
 )
+

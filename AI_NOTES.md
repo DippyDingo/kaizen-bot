@@ -788,3 +788,18 @@
 - Validation after the start-flow fix:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 22 tests.
+
+## 2026-03-07 Reply Keyboard Reset After Chat History Deletion
+
+- Added `_reset_chat_ui_state(chat_id)` to clear cached per-chat UI state:
+  - reply-keyboard carrier message id,
+  - configured reply-keyboard chats,
+  - configured Web App menu chats,
+  - cleared-command chats.
+- `/start` now resets the cached chat UI state before re-publishing the reply keyboard and rendering the main dashboard.
+- The first-run onboarding flow does the same, so a fresh chat with no history also gets a reattached reply keyboard reliably.
+- This improves recovery after Telegram chat history deletion, where the client removes the reply keyboard together with the deleted messages.
+- Limitation remains on the Telegram side: the bot cannot keep reply-keyboard buttons visible in a completely empty chat without sending a new message first.
+- Validation after the reset fix:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 22 tests.
