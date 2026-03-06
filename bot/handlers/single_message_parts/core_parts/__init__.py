@@ -1,4 +1,4 @@
-﻿from .core_parts.builders import (
+﻿from .builders import (
     STATS_PERIOD_LABELS,
     STATS_SLEEP_TARGET_MIN_PER_DAY,
     _build_home_text,
@@ -14,4 +14,4 @@
     _resolve_cancel_view,
     _sleep_duration_text,
 )
-from .core_parts import handlers as _handlers
+from . import handlers as handlers
