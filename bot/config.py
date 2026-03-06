@@ -1,15 +1,15 @@
-from pydantic_settings import BaseSettings
 from pathlib import Path
 
-# Путь к корню проекта (папка выше чем bot/)
-BASE_DIR = Path(__file__).parent.parent
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    # Telegram
     bot_token: str
+    webapp_url: str = "https://example.com"
 
-    # База данных
     database_url: str
     db_host: str = "localhost"
     db_port: int = 5432
@@ -17,20 +17,36 @@ class Settings(BaseSettings):
     db_user: str = "postgres"
     db_password: str = "postgres"
 
-    # Django
     secret_key: str = "dev-secret-key"
     debug: bool = True
 
-    # Claude API
     claude_api_key: str = ""
-
-    # Окружение
     environment: str = "development"
 
-    class Config:
-        env_file = BASE_DIR / ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return True
+
+        text = str(value).strip().lower()
+        truthy = {"1", "true", "yes", "on", "dev", "debug", "development"}
+        falsy = {"0", "false", "no", "off", "prod", "production", "release"}
+
+        if text in truthy:
+            return True
+        if text in falsy:
+            return False
+
+        raise ValueError("debug must be a boolean-like value")
 
 
 settings = Settings()
