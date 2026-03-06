@@ -601,3 +601,17 @@
 - Validation after refactor:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Tasks Refactor
+
+- Split `bot/handlers/single_message_parts/tasks.py` into `bot/handlers/single_message_parts/tasks_parts/`:
+  - `builders.py`
+  - `handlers.py`
+- `tasks.py` is now a thin compatibility wrapper that preserves the existing task builder imports used by the shared dashboard renderer and re-exports `_finalize_task` for calendar-driven task creation.
+- The goal of this refactor was structural only:
+  - align tasks with the same handler/module layout already used for `health`, `calendar`, and `diary`,
+  - separate task keyboard/text builders from Telegram callback/message handlers,
+  - preserve public imports and existing cross-module usage.
+- Validation after refactor:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
