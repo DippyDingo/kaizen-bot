@@ -892,3 +892,30 @@
   - `/api/v1/dashboard` -> `200`
   - `/api/v1/health` -> `200`
   - `/api/v1/stats?period=7d` -> `200`
+## 2026-03-07 Multi-Screen Read-Only Web App
+
+- Reworked `/webapp` from a single summary page into a multi-screen read-only shell.
+- The Web App now has 3 internal screens:
+  - `dashboard`
+  - `health`
+  - `stats`
+- Navigation is handled by in-page tabs without reloading the document.
+- Added a shared toolbar with:
+  - one global selected date,
+  - date switching for dashboard and health,
+  - date + period switching for stats.
+- Added in-memory frontend cache keyed by `(screen, date, period)` so already loaded views are reused within the same page session.
+- Split the old monolithic `webapp/js/app.js` into minimal modules:
+  - app state and routing in `webapp/js/app.js`
+  - API client in `webapp/js/api.js`
+  - shared format helpers in `webapp/js/formatters.js`
+  - screen renderers in `webapp/js/renderers/*`
+- Kept the frontend stack as plain HTML/CSS/JS ES modules; no framework or bundler was introduced.
+- Extended HTTP regression coverage for static assets:
+  - `/webapp`
+  - `/webapp/css/app.css`
+  - `/webapp/js/app.js`
+  - `/webapp/js/renderers/dashboard.js`
+- Validation after the multi-screen Web App pass:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed with 55 tests.

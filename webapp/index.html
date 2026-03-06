@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -14,145 +14,307 @@
 
         <header class="hero card">
             <div class="hero-copy">
-                <p class="eyebrow">KAIZEN</p>
-                <h1 id="hero-title">Загрузка дашборда</h1>
-                <p id="hero-subtitle" class="hero-subtitle">Подтягиваю данные из API.</p>
+                <p class="eyebrow">KAIZEN Web App</p>
+                <h1 id="hero-title">Дашборд</h1>
+                <p id="hero-subtitle" class="hero-subtitle">Read-only экран с данными из текущего API.</p>
             </div>
             <div class="hero-actions">
                 <button id="refresh-button" class="ghost-button" type="button">Обновить</button>
             </div>
         </header>
 
-        <main class="content-grid">
-            <section class="card metric-cluster">
-                <div class="section-heading">
-                    <p class="eyebrow">Сегодня</p>
-                    <h2>Короткий статус</h2>
+        <section class="toolbar card">
+            <nav class="screen-tabs" aria-label="Навигация по Web App">
+                <button id="tab-dashboard" class="screen-tab screen-tab-active" type="button" data-screen="dashboard">Дашборд</button>
+                <button id="tab-health" class="screen-tab" type="button" data-screen="health">Здоровье</button>
+                <button id="tab-stats" class="screen-tab" type="button" data-screen="stats">Статистика</button>
+            </nav>
+
+            <div class="toolbar-controls">
+                <div class="date-switcher">
+                    <button id="date-prev" class="icon-button" type="button" aria-label="Предыдущая дата">◀</button>
+                    <div class="date-copy">
+                        <span class="date-label">Выбранная дата</span>
+                        <strong id="selected-date">-</strong>
+                    </div>
+                    <button id="date-next" class="icon-button" type="button" aria-label="Следующая дата">▶</button>
                 </div>
-                <div class="metric-grid">
-                    <article class="metric-card">
-                        <span class="metric-label">Задачи</span>
-                        <strong id="tasks-value" class="metric-value">-</strong>
-                        <span id="tasks-subvalue" class="metric-subvalue">-</span>
-                    </article>
-                    <article class="metric-card">
-                        <span class="metric-label">Вода</span>
-                        <strong id="water-value" class="metric-value">-</strong>
-                        <span id="water-subvalue" class="metric-subvalue">-</span>
-                    </article>
-                    <article class="metric-card">
-                        <span class="metric-label">Сон</span>
-                        <strong id="sleep-value" class="metric-value">-</strong>
-                        <span id="sleep-subvalue" class="metric-subvalue">-</span>
-                    </article>
-                    <article class="metric-card">
-                        <span class="metric-label">Дневник</span>
-                        <strong id="diary-value" class="metric-value">-</strong>
-                        <span id="diary-subvalue" class="metric-subvalue">-</span>
-                    </article>
+
+                <div id="stats-period-controls" class="period-switcher period-switcher-hidden" aria-label="Период статистики">
+                    <button class="period-pill" type="button" data-period="day">День</button>
+                    <button class="period-pill period-pill-active" type="button" data-period="7d">7 дней</button>
+                    <button class="period-pill" type="button" data-period="30d">30 дней</button>
+                    <button class="period-pill" type="button" data-period="all">Всё время</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="status-card" class="card status-card status-card-hidden">
+            <div class="section-heading">
+                <p class="eyebrow">Системно</p>
+                <h2>Состояние экрана</h2>
+            </div>
+            <p id="status-message">-</p>
+        </section>
+
+        <main class="screen-stack">
+            <section id="screen-dashboard" class="screen-panel screen-panel-active" data-screen-panel="dashboard">
+                <div class="screen-grid">
+                    <section class="card metric-cluster">
+                        <div class="section-heading">
+                            <p class="eyebrow">Сегодня</p>
+                            <h2>Короткий статус</h2>
+                        </div>
+                        <div class="metric-grid">
+                            <article class="metric-card">
+                                <span class="metric-label">Задачи</span>
+                                <strong id="dashboard-tasks-value" class="metric-value">-</strong>
+                                <span id="dashboard-tasks-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Вода</span>
+                                <strong id="dashboard-water-value" class="metric-value">-</strong>
+                                <span id="dashboard-water-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Сон</span>
+                                <strong id="dashboard-sleep-value" class="metric-value">-</strong>
+                                <span id="dashboard-sleep-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Дневник</span>
+                                <strong id="dashboard-diary-value" class="metric-value">-</strong>
+                                <span id="dashboard-diary-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="card progress-panel">
+                        <div class="section-heading">
+                            <p class="eyebrow">Прогресс</p>
+                            <h2>Темп дня</h2>
+                        </div>
+                        <div class="progress-list">
+                            <div class="progress-row">
+                                <div class="progress-copy">
+                                    <span class="progress-label">Ритм</span>
+                                    <strong id="dashboard-progress-tasks-value" class="progress-value">0%</strong>
+                                </div>
+                                <div class="progress-bar"><div id="dashboard-progress-tasks-bar" class="progress-fill progress-fill-tasks"></div></div>
+                            </div>
+                            <div class="progress-row">
+                                <div class="progress-copy">
+                                    <span class="progress-label">Вода</span>
+                                    <strong id="dashboard-progress-water-value" class="progress-value">0%</strong>
+                                </div>
+                                <div class="progress-bar"><div id="dashboard-progress-water-bar" class="progress-fill progress-fill-water"></div></div>
+                            </div>
+                            <div class="progress-row">
+                                <div class="progress-copy">
+                                    <span class="progress-label">Сон</span>
+                                    <strong id="dashboard-progress-sleep-value" class="progress-value">0%</strong>
+                                </div>
+                                <div class="progress-bar"><div id="dashboard-progress-sleep-bar" class="progress-fill progress-fill-sleep"></div></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card focus-panel screen-span-full">
+                        <div class="section-heading">
+                            <p class="eyebrow">Фокус</p>
+                            <h2>Открытые задачи</h2>
+                        </div>
+                        <ul id="dashboard-focus-list" class="focus-list">
+                            <li class="focus-empty">Нет задач на выбранную дату.</li>
+                        </ul>
+                    </section>
                 </div>
             </section>
 
-            <section class="card progress-panel">
-                <div class="section-heading">
-                    <p class="eyebrow">Прогресс</p>
-                    <h2>Темп дня</h2>
-                </div>
-                <div class="progress-list">
-                    <div class="progress-row">
-                        <div class="progress-copy">
-                            <span class="progress-label">Ритм</span>
-                            <strong id="progress-tasks-value" class="progress-value">0%</strong>
+            <section id="screen-health" class="screen-panel" data-screen-panel="health">
+                <div class="screen-grid">
+                    <section class="card health-panel screen-span-full">
+                        <div class="section-heading">
+                            <p class="eyebrow">День</p>
+                            <h2>Текущее состояние</h2>
                         </div>
-                        <div class="progress-bar"><div id="progress-tasks-bar" class="progress-fill progress-fill-tasks"></div></div>
-                    </div>
-                    <div class="progress-row">
-                        <div class="progress-copy">
-                            <span class="progress-label">Вода</span>
-                            <strong id="progress-water-value" class="progress-value">0%</strong>
+                        <div class="health-columns">
+                            <article class="metric-card">
+                                <span class="metric-label">Вода</span>
+                                <strong id="health-day-water-value" class="metric-value">-</strong>
+                                <span id="health-day-water-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Сон</span>
+                                <strong id="health-day-sleep-value" class="metric-value">-</strong>
+                                <span id="health-day-sleep-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Тренировки</span>
+                                <strong id="health-day-workout-value" class="metric-value">-</strong>
+                                <span id="health-day-workout-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Состояние</span>
+                                <strong id="health-day-wellbeing-value" class="metric-value">-</strong>
+                                <span id="health-day-wellbeing-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card metric-card-wide">
+                                <span class="metric-label">Лекарства</span>
+                                <strong id="health-day-medications-value" class="metric-value">-</strong>
+                                <span id="health-day-medications-subvalue" class="metric-subvalue">-</span>
+                            </article>
                         </div>
-                        <div class="progress-bar"><div id="progress-water-bar" class="progress-fill progress-fill-water"></div></div>
-                    </div>
-                    <div class="progress-row">
-                        <div class="progress-copy">
-                            <span class="progress-label">Сон</span>
-                            <strong id="progress-sleep-value" class="progress-value">0%</strong>
+                    </section>
+
+                    <section class="card health-panel screen-span-full">
+                        <div class="section-heading">
+                            <p class="eyebrow">Неделя</p>
+                            <h2>Агрегаты и динамика</h2>
                         </div>
-                        <div class="progress-bar"><div id="progress-sleep-bar" class="progress-fill progress-fill-sleep"></div></div>
-                    </div>
+                        <div class="health-columns">
+                            <article class="metric-card">
+                                <span class="metric-label">Вода</span>
+                                <strong id="health-week-water-value" class="metric-value">-</strong>
+                                <span id="health-week-water-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Сон</span>
+                                <strong id="health-week-sleep-value" class="metric-value">-</strong>
+                                <span id="health-week-sleep-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Тренировки</span>
+                                <strong id="health-week-workout-value" class="metric-value">-</strong>
+                                <span id="health-week-workout-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Состояние</span>
+                                <strong id="health-week-wellbeing-value" class="metric-value">-</strong>
+                                <span id="health-week-wellbeing-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                            <article class="metric-card metric-card-wide">
+                                <span class="metric-label">Лекарства</span>
+                                <strong id="health-week-medications-value" class="metric-value">-</strong>
+                                <span id="health-week-medications-subvalue" class="metric-subvalue">-</span>
+                            </article>
+                        </div>
+                    </section>
                 </div>
             </section>
 
-            <section class="card focus-panel">
-                <div class="section-heading">
-                    <p class="eyebrow">Фокус</p>
-                    <h2>Открытые задачи</h2>
-                </div>
-                <ul id="focus-list" class="focus-list">
-                    <li class="focus-empty">Нет задач на сегодня.</li>
-                </ul>
-            </section>
+            <section id="screen-stats" class="screen-panel" data-screen-panel="stats">
+                <div class="screen-grid">
+                    <section class="card stats-summary-panel screen-span-full">
+                        <div class="section-heading">
+                            <p class="eyebrow">Срез</p>
+                            <h2 id="stats-heading">7 дней</h2>
+                        </div>
+                        <div class="stats-summary-grid">
+                            <article class="stat-tile">
+                                <span class="stat-label">Пользователь</span>
+                                <strong id="stats-user-value">-</strong>
+                            </article>
+                            <article class="stat-tile">
+                                <span class="stat-label">Уровень / EXP</span>
+                                <strong id="stats-level-value">-</strong>
+                            </article>
+                            <article class="stat-tile">
+                                <span class="stat-label">Серия</span>
+                                <strong id="stats-streak-value">-</strong>
+                            </article>
+                            <article class="stat-tile">
+                                <span class="stat-label">Дней в периоде</span>
+                                <strong id="stats-period-days-value">-</strong>
+                            </article>
+                        </div>
+                    </section>
 
-            <section class="card health-panel">
-                <div class="section-heading">
-                    <p class="eyebrow">Здоровье</p>
-                    <h2>Сегодня и неделя</h2>
-                </div>
-                <div class="health-columns">
-                    <div class="health-block">
-                        <h3>День</h3>
-                        <dl class="data-list">
-                            <div><dt>Вода</dt><dd id="health-day-water">-</dd></div>
-                            <div><dt>Сон</dt><dd id="health-day-sleep">-</dd></div>
-                            <div><dt>Тренировки</dt><dd id="health-day-workout">-</dd></div>
-                            <div><dt>Состояние</dt><dd id="health-day-wellbeing">-</dd></div>
-                            <div><dt>Лекарства</dt><dd id="health-day-medications">-</dd></div>
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Задачи</p>
+                            <h2>Результат</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Выполнено</dt><dd id="stats-tasks-completion">-</dd></div>
+                            <div><dt>Приоритеты</dt><dd id="stats-tasks-priority">-</dd></div>
+                            <div><dt>Активные дни</dt><dd id="stats-tasks-active-days">-</dd></div>
                         </dl>
-                    </div>
-                    <div class="health-block">
-                        <h3>Неделя</h3>
-                        <dl class="data-list">
-                            <div><dt>Вода</dt><dd id="health-week-water">-</dd></div>
-                            <div><dt>Сон</dt><dd id="health-week-sleep">-</dd></div>
-                            <div><dt>Тренировки</dt><dd id="health-week-workout">-</dd></div>
-                            <div><dt>Состояние</dt><dd id="health-week-wellbeing">-</dd></div>
-                            <div><dt>Лекарства</dt><dd id="health-week-medications">-</dd></div>
+                    </section>
+
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Вода</p>
+                            <h2>Гидратация</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Всего</dt><dd id="stats-water-total">-</dd></div>
+                            <div><dt>Среднее</dt><dd id="stats-water-average">-</dd></div>
+                            <div><dt>Лучший день</dt><dd id="stats-water-best">-</dd></div>
                         </dl>
-                    </div>
-                </div>
-            </section>
+                    </section>
 
-            <section class="card stats-panel">
-                <div class="section-heading">
-                    <p class="eyebrow">7 дней</p>
-                    <h2>Срез статистики</h2>
-                </div>
-                <div class="stats-grid">
-                    <article class="stat-tile">
-                        <span class="stat-label">Выполнение</span>
-                        <strong id="stats-tasks">-</strong>
-                    </article>
-                    <article class="stat-tile">
-                        <span class="stat-label">Средняя вода</span>
-                        <strong id="stats-water">-</strong>
-                    </article>
-                    <article class="stat-tile">
-                        <span class="stat-label">Средний сон</span>
-                        <strong id="stats-sleep">-</strong>
-                    </article>
-                    <article class="stat-tile">
-                        <span class="stat-label">Энергия / стресс</span>
-                        <strong id="stats-wellbeing">-</strong>
-                    </article>
-                </div>
-            </section>
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Сон</p>
+                            <h2>Восстановление</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Всего</dt><dd id="stats-sleep-total">-</dd></div>
+                            <div><dt>Среднее</dt><dd id="stats-sleep-average">-</dd></div>
+                            <div><dt>Качество</dt><dd id="stats-sleep-quality">-</dd></div>
+                        </dl>
+                    </section>
 
-            <section id="status-card" class="card status-card status-card-hidden">
-                <div class="section-heading">
-                    <p class="eyebrow">Системно</p>
-                    <h2>Состояние экрана</h2>
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Тренировки</p>
+                            <h2>Нагрузка</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Всего</dt><dd id="stats-workout-total">-</dd></div>
+                            <div><dt>Сессии</dt><dd id="stats-workout-sessions">-</dd></div>
+                            <div><dt>Типы</dt><dd id="stats-workout-types">-</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Лекарства</p>
+                            <h2>Приемы</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Всего</dt><dd id="stats-medications-total">-</dd></div>
+                            <div><dt>Выпито</dt><dd id="stats-medications-taken">-</dd></div>
+                            <div><dt>Частое</dt><dd id="stats-medications-top">-</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="card stats-block">
+                        <div class="section-heading">
+                            <p class="eyebrow">Состояние</p>
+                            <h2>Энергия и стресс</h2>
+                        </div>
+                        <dl class="data-list compact-list">
+                            <div><dt>Энергия</dt><dd id="stats-wellbeing-energy">-</dd></div>
+                            <div><dt>Стресс</dt><dd id="stats-wellbeing-stress">-</dd></div>
+                            <div><dt>Активные дни</dt><dd id="stats-wellbeing-active-days">-</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="card stats-block screen-span-full">
+                        <div class="section-heading">
+                            <p class="eyebrow">Дневник</p>
+                            <h2>Записи</h2>
+                        </div>
+                        <dl class="data-list compact-list two-column-list">
+                            <div><dt>Всего записей</dt><dd id="stats-diary-total">-</dd></div>
+                            <div><dt>Активные дни</dt><dd id="stats-diary-active-days">-</dd></div>
+                            <div><dt>Лучший день</dt><dd id="stats-diary-best-day">-</dd></div>
+                            <div><dt>Создан</dt><dd id="stats-created-at">-</dd></div>
+                        </dl>
+                    </section>
                 </div>
-                <p id="status-message">-</p>
             </section>
         </main>
     </div>

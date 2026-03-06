@@ -77,3 +77,22 @@ class ApiHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(200, response.status)
         body = await response.text()
         self.assertIn("KAIZEN Web App", body)
+        self.assertIn("tab-dashboard", body)
+        self.assertIn("tab-health", body)
+        self.assertIn("tab-stats", body)
+
+    async def test_webapp_css_route_serves_stylesheet(self) -> None:
+        response = await self.client.get("/webapp/css/app.css")
+
+        self.assertEqual(200, response.status)
+        body = await response.text()
+        self.assertIn(".screen-tab", body)
+
+    async def test_webapp_js_routes_serve_modules(self) -> None:
+        entry_response = await self.client.get("/webapp/js/app.js")
+        nested_response = await self.client.get("/webapp/js/renderers/dashboard.js")
+
+        self.assertEqual(200, entry_response.status)
+        self.assertEqual(200, nested_response.status)
+        self.assertIn("renderActiveScreen", await entry_response.text())
+        self.assertIn("renderDashboardScreen", await nested_response.text())

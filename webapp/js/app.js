@@ -1,144 +1,220 @@
-const api = {
-    dashboard: "/api/v1/dashboard",
-    health: "/api/v1/health",
-    stats: "/api/v1/stats?period=7d",
+﻿import { ApiError, bootstrapTelegramWebApp, createApiClient } from "./api.js";
+import { $, formatDateLabel, formatPeriodLabel, setText } from "./formatters.js";
+import { renderDashboardScreen } from "./renderers/dashboard.js";
+import { renderHealthScreen } from "./renderers/health.js";
+import { renderStatsScreen } from "./renderers/stats.js";
+
+const SCREEN_TITLES = {
+    dashboard: {
+        title: "Дашборд",
+        subtitle: "Сводка на выбранную дату: задачи, вода, сон и дневник.",
+    },
+    health: {
+        title: "Здоровье",
+        subtitle: "Дневные и недельные агрегаты по воде, сну, тренировкам, лекарствам и состоянию.",
+    },
+    stats: {
+        title: "Статистика",
+        subtitle: "Периодический read-only срез по текущему API без write-операций.",
+    },
 };
 
-function $(id) {
-    return document.getElementById(id);
+const appState = {
+    activeScreen: "dashboard",
+    selectedDate: new Date().toISOString().slice(0, 10),
+    statsPeriod: "7d",
+    cache: new Map(),
+    api: null,
+    initData: "",
+};
+
+function cacheKey(screen) {
+    return `${screen}:${appState.selectedDate}:${screen === "stats" ? appState.statsPeriod : "-"}`;
 }
 
-function minutesToLabel(minutes) {
-    const safe = Math.max(0, Number(minutes || 0));
-    const hours = Math.floor(safe / 60);
-    const rest = safe % 60;
-    if (rest === 0) {
-        return `${hours} ч`;
-    }
-    return `${hours} ч ${rest} м`;
+function shiftSelectedDate(diffDays) {
+    const base = new Date(`${appState.selectedDate}T00:00:00`);
+    base.setDate(base.getDate() + diffDays);
+    appState.selectedDate = base.toISOString().slice(0, 10);
 }
 
-function setProgress(id, percent) {
-    $(id).style.width = `${Math.max(0, Math.min(100, Number(percent || 0)))}%`;
-}
-
-function setStatus(message, { visible = true } = {}) {
+function setStatus(message, kind = "info", { visible = true } = {}) {
     const card = $("status-card");
     const body = $("status-message");
     body.textContent = message;
-    card.classList.toggle("status-card-hidden", !visible);
-}
-
-async function fetchJson(url, initData) {
-    const response = await fetch(url, {
-        headers: {
-            "X-Telegram-Init-Data": initData,
-        },
-    });
-
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        const detail = payload.detail || `HTTP ${response.status}`;
-        throw new Error(detail);
-    }
-
-    return response.json();
-}
-
-function renderDashboard(dashboard) {
-    $("hero-title").textContent = `${dashboard.user.display_name}, день под контролем`;
-    $("hero-subtitle").textContent = `Уровень ${dashboard.user.level} · EXP ${dashboard.user.exp}/${dashboard.user.exp_to_next_level} · streak ${dashboard.user.current_streak}`;
-
-    $("tasks-value").textContent = `${dashboard.summary.tasks.done}/${dashboard.summary.tasks.total}`;
-    $("tasks-subvalue").textContent = `${dashboard.summary.tasks.open} открыто`;
-    $("water-value").textContent = `${dashboard.summary.water.total_ml} мл`;
-    $("water-subvalue").textContent = `цель ${dashboard.summary.water.target_ml} мл`;
-    $("sleep-value").textContent = minutesToLabel(dashboard.summary.sleep.total_minutes);
-    $("sleep-subvalue").textContent = `цель ${minutesToLabel(dashboard.summary.sleep.target_minutes)}`;
-    $("diary-value").textContent = String(dashboard.summary.diary.entries);
-    $("diary-subvalue").textContent = "записей сегодня";
-
-    $("progress-tasks-value").textContent = `${dashboard.progress.tasks_percent}%`;
-    $("progress-water-value").textContent = `${dashboard.progress.water_percent}%`;
-    $("progress-sleep-value").textContent = `${dashboard.progress.sleep_percent}%`;
-    setProgress("progress-tasks-bar", dashboard.progress.tasks_percent);
-    setProgress("progress-water-bar", dashboard.progress.water_percent);
-    setProgress("progress-sleep-bar", dashboard.progress.sleep_percent);
-
-    const focusList = $("focus-list");
-    focusList.innerHTML = "";
-    if (!dashboard.focus_tasks.length) {
-        focusList.innerHTML = `<li class="focus-empty">Нет открытых задач на выбранную дату.</li>`;
+    card.className = "card status-card";
+    if (!visible) {
+        card.classList.add("status-card-hidden");
         return;
     }
+    card.classList.add(`status-card-${kind}`);
+}
 
-    for (const task of dashboard.focus_tasks) {
-        const item = document.createElement("li");
-        item.innerHTML = `
-            <div>
-                <strong>${task.title}</strong>
-            </div>
-            <span class="focus-priority">${task.priority}</span>
-        `;
-        focusList.appendChild(item);
+function syncShell() {
+    const title = SCREEN_TITLES[appState.activeScreen];
+    setText("hero-title", title.title);
+    setText("hero-subtitle", title.subtitle);
+    setText("selected-date", formatDateLabel(appState.selectedDate));
+
+    for (const button of document.querySelectorAll(".screen-tab")) {
+        button.classList.toggle("screen-tab-active", button.dataset.screen === appState.activeScreen);
+    }
+
+    for (const panel of document.querySelectorAll(".screen-panel")) {
+        panel.classList.toggle("screen-panel-active", panel.dataset.screenPanel === appState.activeScreen);
+    }
+
+    const periodControls = $("stats-period-controls");
+    periodControls.classList.toggle("period-switcher-hidden", appState.activeScreen !== "stats");
+
+    for (const button of document.querySelectorAll(".period-pill")) {
+        button.classList.toggle("period-pill-active", button.dataset.period === appState.statsPeriod);
     }
 }
 
-function renderHealth(health) {
-    $("health-day-water").textContent = `${health.day.water.total_ml}/${health.day.water.target_ml} мл`;
-    $("health-day-sleep").textContent = `${minutesToLabel(health.day.sleep.total_minutes)} · качество ${health.day.sleep.avg_quality || 0}`;
-    $("health-day-workout").textContent = `${health.day.workout.total_minutes} мин`;
-    $("health-day-wellbeing").textContent = health.day.wellbeing.has_entry
-        ? `${health.day.wellbeing.energy_level}/5 · стресс ${health.day.wellbeing.stress_level}/5`
-        : "нет записи";
-    $("health-day-medications").textContent = `${health.day.medications.taken}/${health.day.medications.total} отмечено`;
+async function loadScreenData(screen, { force = false } = {}) {
+    const key = cacheKey(screen);
+    if (!force && appState.cache.has(key)) {
+        return appState.cache.get(key);
+    }
 
-    $("health-week-water").textContent = `${health.week.water.total_ml} мл · ${health.week.water.active_days} дней`;
-    $("health-week-sleep").textContent = `${minutesToLabel(health.week.sleep.total_minutes)} · ср ${health.week.sleep.avg_quality || 0}`;
-    $("health-week-workout").textContent = `${health.week.workout.total_minutes} мин · ${health.week.workout.sessions_count} сессий`;
-    $("health-week-wellbeing").textContent = `${health.week.wellbeing.avg_energy || 0}/5 · стресс ${health.week.wellbeing.avg_stress || 0}/5`;
-    $("health-week-medications").textContent = `${health.week.medications.taken_count}/${health.week.medications.total_logs} выпито`;
+    let payload;
+    if (screen === "dashboard") {
+        payload = await appState.api.loadDashboard(appState.selectedDate);
+    } else if (screen === "health") {
+        payload = await appState.api.loadHealth(appState.selectedDate);
+    } else {
+        payload = await appState.api.loadStats(appState.selectedDate, appState.statsPeriod);
+    }
+
+    appState.cache.set(key, payload);
+    return payload;
 }
 
-function renderStats(stats) {
-    $("stats-tasks").textContent = `${stats.tasks.done}/${stats.tasks.total} · ${stats.tasks.percent}%`;
-    $("stats-water").textContent = `${stats.water.average_daily_ml} мл/д`;
-    $("stats-sleep").textContent = `${minutesToLabel(stats.sleep.average_daily_minutes)}/д`;
-    $("stats-wellbeing").textContent = `${stats.wellbeing.avg_energy || 0}/5 · ${stats.wellbeing.avg_stress || 0}/5`;
-}
-
-async function loadScreen() {
-    const webApp = window.Telegram?.WebApp;
-    const initData = webApp?.initData;
-
-    if (!initData) {
-        setStatus("Этот экран работает только внутри Telegram Web App. Нужен валидный initData.", { visible: true });
-        $("hero-title").textContent = "Нет Telegram auth";
-        $("hero-subtitle").textContent = "Открой экран через кнопку Web App из бота.";
+function renderLoadedScreen(screen, payload) {
+    if (screen === "dashboard") {
+        renderDashboardScreen(payload);
         return;
     }
+    if (screen === "health") {
+        renderHealthScreen(payload);
+        return;
+    }
+    renderStatsScreen(payload);
+}
 
-    webApp.ready();
-    webApp.expand();
-    setStatus("Обновляю данные…", { visible: true });
+function describeError(error) {
+    if (!(error instanceof ApiError)) {
+        return {
+            kind: "error",
+            message: error?.message || "Не удалось загрузить экран.",
+        };
+    }
+
+    if (error.kind === "auth_missing") {
+        return {
+            kind: "warning",
+            message: "Открой Web App через Telegram, чтобы передать initData.",
+        };
+    }
+    if (error.kind === "unauthorized") {
+        return {
+            kind: "error",
+            message: "Telegram auth не прошел. Открой экран заново из бота.",
+        };
+    }
+    if (error.kind === "not_found") {
+        return {
+            kind: "warning",
+            message: "Пользователь еще не зарегистрирован в боте. Сначала открой /start в Telegram.",
+        };
+    }
+    if (error.kind === "invalid_query") {
+        return {
+            kind: "error",
+            message: `Некорректные параметры запроса: ${error.detail}`,
+        };
+    }
+    if (error.kind === "network") {
+        return {
+            kind: "error",
+            message: "Нет соединения с API. Проверь, что процесс backend.api.main запущен.",
+        };
+    }
+    return {
+        kind: "error",
+        message: `Ошибка API: ${error.detail}`,
+    };
+}
+
+async function renderActiveScreen({ force = false } = {}) {
+    syncShell();
+    setStatus(`Загружаю экран «${SCREEN_TITLES[appState.activeScreen].title}»…`, "info");
 
     try {
-        const [dashboard, health, stats] = await Promise.all([
-            fetchJson(api.dashboard, initData),
-            fetchJson(api.health, initData),
-            fetchJson(api.stats, initData),
-        ]);
-        renderDashboard(dashboard);
-        renderHealth(health);
-        renderStats(stats);
-        setStatus(`Данные обновлены на ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`);
+        const payload = await loadScreenData(appState.activeScreen, { force });
+        renderLoadedScreen(appState.activeScreen, payload);
+        const suffix = appState.activeScreen === "stats" ? ` · период ${formatPeriodLabel(appState.statsPeriod)}` : "";
+        setStatus(`Данные обновлены: ${formatDateLabel(appState.selectedDate)}${suffix}`, "success");
     } catch (error) {
-        setStatus(`Не удалось загрузить данные: ${error.message}`, { visible: true });
+        const details = describeError(error);
+        setStatus(details.message, details.kind);
     }
 }
 
-$("refresh-button").addEventListener("click", () => {
-    loadScreen();
-});
+function bindEvents() {
+    $("refresh-button").addEventListener("click", () => {
+        appState.cache.delete(cacheKey(appState.activeScreen));
+        renderActiveScreen({ force: true });
+    });
 
-loadScreen();
+    $("date-prev").addEventListener("click", () => {
+        shiftSelectedDate(-1);
+        renderActiveScreen();
+    });
+
+    $("date-next").addEventListener("click", () => {
+        shiftSelectedDate(1);
+        renderActiveScreen();
+    });
+
+    for (const button of document.querySelectorAll(".screen-tab")) {
+        button.addEventListener("click", () => {
+            appState.activeScreen = button.dataset.screen;
+            renderActiveScreen();
+        });
+    }
+
+    for (const button of document.querySelectorAll(".period-pill")) {
+        button.addEventListener("click", () => {
+            if (appState.statsPeriod === button.dataset.period) {
+                return;
+            }
+            appState.statsPeriod = button.dataset.period;
+            if (appState.activeScreen === "stats") {
+                renderActiveScreen();
+            } else {
+                syncShell();
+            }
+        });
+    }
+}
+
+function bootstrap() {
+    const context = bootstrapTelegramWebApp();
+    appState.api = createApiClient();
+    appState.initData = context.initData;
+    bindEvents();
+
+    if (!appState.initData) {
+        syncShell();
+        setStatus("Этот экран работает только внутри Telegram Mini App. Открой Web App из бота.", "warning");
+        setText("hero-title", "Нет Telegram auth");
+        setText("hero-subtitle", "API требует X-Telegram-Init-Data, поэтому в обычном браузере данные не загрузятся.");
+        return;
+    }
+
+    renderActiveScreen();
+}
+
+bootstrap();
