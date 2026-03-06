@@ -6,6 +6,7 @@ EXP_TABLE: dict[str, int] = {
     "water_logged": 2,
     "sleep_logged": 20,
     "workout_logged": 30,
+    "medication_logged": 10,
     "diary_logged": 10,
 }
 

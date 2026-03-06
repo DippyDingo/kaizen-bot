@@ -13,6 +13,7 @@ from .common import (
     MONTH_NAMES,
     VIEW_CALENDAR,
     VIEW_DIARY,
+    VIEW_HEALTH,
     WEEKDAY_LABELS,
     _month_start,
     _next_month,
@@ -23,9 +24,16 @@ from .common import (
 )
 
 
-def _build_calendar_keyboard(month_date: date, selected_date: date, context: str) -> InlineKeyboardMarkup:
+def _build_calendar_keyboard(
+    month_date: date,
+    selected_date: date,
+    context: str,
+    *,
+    marks: dict[date, str] | None = None,
+) -> InlineKeyboardMarkup:
     cal = calendar.Calendar(firstweekday=0)
     weeks = cal.monthdayscalendar(month_date.year, month_date.month)
+    marks = marks or {}
 
     rows: list[list[InlineKeyboardButton]] = [
         [
@@ -49,6 +57,12 @@ def _build_calendar_keyboard(month_date: date, selected_date: date, context: str
             text = str(day_num)
             if day_date == selected_date:
                 text = f"🔘{day_num}"
+            elif context == "med" and marks.get(day_date) == "done":
+                text = f"✅{day_num}"
+            elif context == "med" and marks.get(day_date) == "skipped":
+                text = f"✖️{day_num}"
+            elif context == "med" and marks.get(day_date) == "planned":
+                text = f"💊{day_num}"
             elif day_date == today:
                 text = f"◦{day_num}"
 
@@ -86,6 +100,10 @@ def _build_calendar_keyboard(month_date: date, selected_date: date, context: str
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:diary")])
         rows.append([InlineKeyboardButton(text="📝 Записи", callback_data="cal:to_diary")])
         rows.append([InlineKeyboardButton(text="↩️ Дневник", callback_data="diary:close_calendar")])
+    elif context == "med":
+        rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:med")])
+        rows.append([InlineKeyboardButton(text="💊 Лекарства", callback_data="cal:to_med")])
+        rows.append([InlineKeyboardButton(text="↩️ Окно лекарств", callback_data="med:close_calendar")])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -142,6 +160,10 @@ async def cb_cal_nav(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(view_mode=VIEW_CALENDAR, diary_calendar_mode=False)
     elif context == "diary":
         await state.update_data(view_mode=VIEW_DIARY, diary_calendar_mode=True)
+    elif context == "med":
+        from .health import HEALTH_MODE_MEDICATION_CALENDAR
+
+        await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_CALENDAR)
     else:
         await state.set_state(DashboardStates.waiting_task_date)
 
@@ -181,6 +203,19 @@ async def cb_cal_today(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer()
         return
 
+    if context == "med":
+        from .health import HEALTH_MODE_MEDICATIONS
+
+        await state.update_data(
+            selected_date=today.isoformat(),
+            calendar_month=_month_start(today).isoformat(),
+            view_mode=VIEW_HEALTH,
+            health_mode=HEALTH_MODE_MEDICATIONS,
+        )
+        await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {today.strftime('%d.%m.%Y')}")
+        await callback.answer()
+        return
+
     if context == "create":
         from .tasks import _finalize_task
 
@@ -211,6 +246,18 @@ async def cb_cal_pick(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer()
         return
 
+    if context == "med":
+        from .health import HEALTH_MODE_MEDICATIONS
+
+        await state.update_data(
+            selected_date=picked_date.isoformat(),
+            view_mode=VIEW_HEALTH,
+            health_mode=HEALTH_MODE_MEDICATIONS,
+        )
+        await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {picked_date.strftime('%d.%m.%Y')}")
+        await callback.answer()
+        return
+
     if context == "create":
         from .tasks import _finalize_task
 
@@ -221,5 +268,14 @@ async def cb_cal_pick(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "cal:to_diary")
 async def cb_cal_to_diary(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(view_mode=VIEW_DIARY, diary_calendar_mode=False)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cal:to_med")
+async def cb_cal_to_med(callback: CallbackQuery, state: FSMContext) -> None:
+    from .health import HEALTH_MODE_MEDICATIONS
+
+    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATIONS)
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()

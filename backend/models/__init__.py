@@ -1,5 +1,7 @@
 from backend.models.diary_entry import DiaryEntry
 from backend.models.habit import Habit
+from backend.models.medication_course import MedicationCourse
+from backend.models.medication_log import MedicationLog
 from backend.models.sleep_log import SleepLog
 from backend.models.task import Task
 from backend.models.user import User
@@ -12,6 +14,8 @@ __all__ = [
     "Task",
     "WaterLog",
     "SleepLog",
+    "MedicationCourse",
+    "MedicationLog",
     "Habit",
     "WorkoutLog",
 ]

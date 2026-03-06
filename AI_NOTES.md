@@ -461,4 +461,126 @@
   - `bot/handlers/single_message_parts/core.py`
   - `bot/handlers/single_message_parts/health.py`
   - `alembic/versions/20260306_000006_add_user_daily_targets.py`
-  - `README.md`
+  - `README.md`## 2026-03-06 Medication Logs And Minimal Tests
+
+- Added a new `MedicationLog` model and migration `20260306_000007_add_medication_logs`.
+- Added medication operations to the health service:
+  - create medication log,
+  - undo last medication log for a selected day,
+  - list latest day medications,
+  - period aggregates for statistics and weekly summaries.
+- Expanded the `Здоровье` UI with a medication flow:
+  - enter medication title,
+  - enter dose,
+  - save intake,
+  - undo last intake.
+- Added medication summaries to health screens:
+  - day summary with latest intakes,
+  - week summary with active days and most frequent medication.
+- Expanded the statistics screen with a dedicated medications block.
+- Added a minimal `unittest` suite for:
+  - stats period helpers,
+  - home water target bar helper,
+  - health parsing helpers,
+  - cancel-view routing,
+  - daily target clamping in user service.
+- This is not full bot coverage yet; it is the first minimal safety net around the current MVP logic.
+- Updated files:
+  - `backend/models/medication_log.py`
+  - `backend/models/__init__.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `backend/services/rpg_service.py`
+  - `bot/states/states.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `alembic/versions/20260306_000007_add_medication_logs.py`
+  - `tests/test_common_helpers.py`
+  - `tests/test_core_logic.py`
+  - `tests/test_health_helpers.py`
+  - `tests/test_user_service.py`
+  - `README.md`## 2026-03-06 Medication Courses And Calendar UI
+
+- Reworked medications from one-off logs into a proper scheduled flow.
+- Added a new `MedicationCourse` model and migration `20260306_000008_add_medication_courses_and_schedule_status`.
+- Extended `MedicationLog` to store:
+  - `course_id`,
+  - `scheduled_date`,
+  - `status` (`taken` / `skipped`).
+- Added medication service operations for:
+  - creating a course,
+  - archiving a course,
+  - toggling day status (`taken` / `skipped` / reset to pending),
+  - building medication day schedule,
+  - building medication calendar marks.
+- The `Здоровье` section now has a dedicated medication window:
+  - course creation flow `title -> dose -> time -> days`,
+  - medication calendar,
+  - per-day scheduled list,
+  - `выпил / пропуск` actions,
+  - course deletion.
+- The medication calendar uses visual day marks:
+  - `??` scheduled,
+  - `?` fully taken,
+  - `??` skipped.
+- Statistics were updated to show medication taken vs skipped counts.
+- Expanded minimal tests with medication helper coverage.
+- Updated files:
+  - `backend/models/medication_course.py`
+  - `backend/models/medication_log.py`
+  - `backend/models/__init__.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/calendar.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/states/states.py`
+  - `alembic/versions/20260306_000008_add_medication_courses_and_schedule_status.py`
+  - `tests/test_core_logic.py`
+  - `tests/test_health_helpers.py`
+  - `README.md`## 2026-03-06 Health Module Refactor
+
+- Split the oversized Telegram health handler into logical modules under `bot/handlers/single_message_parts/health_parts/`:
+  - `builders.py`
+  - `state.py`
+  - `water.py`
+  - `sleep.py`
+  - `medications.py`
+  - `workouts.py`
+  - `modes.py`
+- `bot/handlers/single_message_parts/health.py` is now a thin compatibility wrapper that re-exports the public helpers and constants used elsewhere in the bot.
+- Split the oversized backend health service into domain modules under `backend/services/health_parts/`:
+  - `hydration.py`
+  - `sleep.py`
+  - `workout.py`
+  - `medication.py`
+- `backend/services/health_service.py` is now a thin compatibility wrapper that re-exports the existing public API, so external imports did not need to change.
+- The goal of this refactor was structural only:
+  - reduce file size,
+  - make each health subdomain easier to navigate,
+  - keep runtime behavior and import paths compatible.
+- Validation after refactor:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
+## 2026-03-06 Common And Core Refactor
+
+- Split the oversized `bot/handlers/single_message_parts/common.py` into logical modules under `bot/handlers/single_message_parts/common_parts/`:
+  - `constants.py`
+  - `helpers.py`
+  - `data.py`
+  - `chat_ui.py`
+  - `dashboard.py`
+- `bot/handlers/single_message_parts/common.py` is now a thin compatibility wrapper that re-exports the existing constants, helpers, chat UI functions, and dashboard functions used by other handlers and tests.
+- Split the oversized `bot/handlers/single_message_parts/core.py` into logical modules under `bot/handlers/single_message_parts/core_parts/`:
+  - `builders.py`
+  - `handlers.py`
+- `bot/handlers/single_message_parts/core.py` is now a thin compatibility wrapper that re-exports screen builders and flow helpers while loading handler registrations for router side effects.
+- The refactor goal was structural only:
+  - reduce navigation cost inside the bot UI layer,
+  - isolate pure text/keyboard builders from Telegram handler wiring,
+  - preserve external import paths so the rest of the bot did not need bulk edits.
+- Validation after refactor:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
