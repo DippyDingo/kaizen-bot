@@ -615,3 +615,16 @@
 - Validation after refactor:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Single Message Package Export Cleanup
+
+- Tightened `bot/handlers/single_message_parts/__init__.py` so the package still exposes only `router`, while submodules are imported under private aliases only for handler-registration side effects.
+- Added explicit `__all__` declarations to wrapper modules:
+  - `calendar.py`
+  - `diary.py`
+  - `tasks.py`
+  - `core.py`
+- This removed implicit wrapper re-exports and made the public surface of the single-message package more explicit after the refactor wave.
+- Validation after cleanup:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed.
