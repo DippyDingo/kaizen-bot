@@ -20,6 +20,8 @@ from backend.services.health_service import (
     get_water_details_for_period,
     get_water_total_all_time,
     get_water_total_for_period,
+    get_wellbeing_details_for_period,
+    get_wellbeing_for_day,
     get_workout_details_for_period,
     list_medication_schedule_for_day,
 )
@@ -43,11 +45,13 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         day_water_total = await get_today_water_total(session, user_id, selected_date)
         day_sleep_total = await get_day_sleep_total_minutes(session, user_id, selected_date)
         day_workout_total = await get_day_workout_total_minutes(session, user_id, selected_date)
+        day_wellbeing = await get_wellbeing_for_day(session, user_id, selected_date)
         day_medication_schedule = await list_medication_schedule_for_day(session, user_id, selected_date)
         day_sleep_details = await get_sleep_details_for_period(session, user_id, selected_date, selected_date)
         week_water_details = await get_water_details_for_period(session, user_id, week_from, selected_date)
         week_sleep_details = await get_sleep_details_for_period(session, user_id, week_from, selected_date)
         week_workout_details = await get_workout_details_for_period(session, user_id, week_from, selected_date)
+        week_wellbeing_details = await get_wellbeing_details_for_period(session, user_id, week_from, selected_date)
         week_medication_details = await get_medication_details_for_period(session, user_id, week_from, selected_date)
 
     return {
@@ -55,6 +59,9 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "day_water_total": day_water_total,
         "day_sleep_total": day_sleep_total,
         "day_workout_total": day_workout_total,
+        "day_energy_level": int(day_wellbeing["energy_level"]),
+        "day_stress_level": int(day_wellbeing["stress_level"]),
+        "day_has_wellbeing": bool(day_wellbeing["has_entry"]),
         "day_medication_total": len(day_medication_schedule),
         "day_medication_taken": sum(1 for item in day_medication_schedule if item["status"] == "taken"),
         "day_medication_skipped": sum(1 for item in day_medication_schedule if item["status"] == "skipped"),
@@ -81,6 +88,12 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "week_strength_minutes": int(week_workout_details["strength_minutes"]),
         "week_cardio_minutes": int(week_workout_details["cardio_minutes"]),
         "week_mobility_minutes": int(week_workout_details["mobility_minutes"]),
+        "week_wellbeing_entries": int(week_wellbeing_details["entries_count"]),
+        "week_wellbeing_active_days": int(week_wellbeing_details["active_days"]),
+        "week_avg_energy": float(week_wellbeing_details["avg_energy"]),
+        "week_avg_stress": float(week_wellbeing_details["avg_stress"]),
+        "week_best_energy_day": week_wellbeing_details["best_energy_day"],
+        "week_highest_stress_day": week_wellbeing_details["highest_stress_day"],
         "week_medication_total": int(week_medication_details["total_logs"]),
         "week_medication_active_days": int(week_medication_details["active_days"]),
         "week_medication_unique": int(week_medication_details["unique_titles"]),
@@ -149,6 +162,7 @@ async def _load_user_period_stats(from_user, selected_date: date, period: str) -
         water_details = await get_water_details_for_period(session, user.id, detail_from, detail_to)
         sleep_details = await get_sleep_details_for_period(session, user.id, detail_from, detail_to)
         workout_details = await get_workout_details_for_period(session, user.id, detail_from, detail_to)
+        wellbeing_details = await get_wellbeing_details_for_period(session, user.id, detail_from, detail_to)
         medication_details = await get_medication_details_for_period(session, user.id, detail_from, detail_to)
         diary_details = await get_diary_details_for_period(session, user.id, detail_from, detail_to)
 
@@ -165,6 +179,7 @@ async def _load_user_period_stats(from_user, selected_date: date, period: str) -
         "water_details": water_details,
         "sleep_details": sleep_details,
         "workout_details": workout_details,
+        "wellbeing_details": wellbeing_details,
         "medication_details": medication_details,
         "diary_details": diary_details,
     }

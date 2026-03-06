@@ -26,12 +26,15 @@ from backend.services.health_service import (
     get_workout_details_for_period,
     get_water_total_for_period,
     get_water_total_all_time,
+    get_wellbeing_details_for_period,
+    get_wellbeing_for_day,
     list_day_medication_logs,
     list_medication_schedule_for_day,
     remove_last_medication_log,
     remove_last_workout_log,
     remove_last_sleep_log,
     toggle_medication_intake_status,
+    upsert_wellbeing_log,
 )
 from backend.services.rpg_service import EXP_TABLE, add_exp, calculate_next_level_exp, remove_exp
 from backend.services.task_service import (
@@ -99,6 +102,9 @@ __all__ = [
     "list_medication_schedule_for_day",
     "toggle_medication_intake_status",
     "get_workout_details_for_period",
+    "get_wellbeing_details_for_period",
+    "get_wellbeing_for_day",
+    "upsert_wellbeing_log",
     "get_task_details_for_period",
     "get_task_totals_for_period",
 ]

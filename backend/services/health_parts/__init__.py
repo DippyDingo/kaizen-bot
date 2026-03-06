@@ -34,6 +34,12 @@ from .workout import (
     get_workout_details_for_period,
     remove_last_workout_log,
 )
+from .wellbeing import (
+    _build_wellbeing_details,
+    get_wellbeing_details_for_period,
+    get_wellbeing_for_day,
+    upsert_wellbeing_log,
+)
 
 __all__ = [
     "_build_medication_calendar_marks",
@@ -57,6 +63,9 @@ __all__ = [
     "get_water_total_all_time",
     "get_water_total_for_period",
     "get_workout_details_for_period",
+    "_build_wellbeing_details",
+    "get_wellbeing_details_for_period",
+    "get_wellbeing_for_day",
     "list_day_medication_logs",
     "list_medication_schedule_for_day",
     "remove_last_medication_log",
@@ -64,4 +73,5 @@ __all__ = [
     "remove_last_water_log",
     "remove_last_workout_log",
     "toggle_medication_intake_status",
+    "upsert_wellbeing_log",
 ]

@@ -22,4 +22,5 @@ async def _reset_health_mode(state: FSMContext) -> None:
         pending_medication_dose=None,
         pending_medication_time=None,
         pending_workout_type=None,
+        pending_energy_level=None,
     )

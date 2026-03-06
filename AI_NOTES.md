@@ -814,3 +814,35 @@
 - Validation after the stabilization pass:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 27 tests.
+## 2026-03-07 Health Wellbeing MVP
+
+- Added `wellbeing_logs` with one row per `(user_id, logged_date)` and a unique constraint for daily upsert semantics.
+- Added `WellbeingLog` model and Alembic migration `20260306_000010_add_wellbeing_logs`.
+- Implemented wellbeing service helpers:
+  - `upsert_wellbeing_log(...)`
+  - `get_wellbeing_for_day(...)`
+  - `get_wellbeing_details_for_period(...)`
+  - `_build_wellbeing_details(...)`
+- Integrated wellbeing aggregates into health summary loading and period statistics loading.
+- Added button-only Telegram flow inside `Çäîğîâüå`:
+  - `?? Ñîñòîÿíèå`
+  - energy step `1..5`
+  - stress step `1..5`
+  - save and return to day summary.
+- Added new health modes:
+  - `wellbeing_energy`
+  - `wellbeing_stress`
+- Health summaries now show:
+  - day energy and stress,
+  - week average energy and stress,
+  - wellbeing active days.
+- Statistics now include a dedicated `Ñîñòîÿíèå` block with entries, averages, active days, best energy day, and highest stress day.
+- Added wellbeing tests:
+  - `tests/test_health_service_wellbeing.py`
+  - `tests/test_health_wellbeing_logic.py`
+- Validation before migration/runtime restart:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 36 tests.
+- Improved the wellbeing question screens inside `Çäîğîâüå` so the prompt itself is visually highlighted, not only the save confirmation.
+- `wellbeing_energy` now renders a dedicated block with `?? ÎÖÅÍÊÀ ÑÎÑÒÎßÍÈß` and `Øàã 1/2 · İíåğãèÿ`.
+- `wellbeing_stress` now renders a dedicated block with `?? ÎÖÅÍÊÀ ÑÎÑÒÎßÍÈß`, `Øàã 2/2 · Ñòğåññ`, and the previously chosen energy value.

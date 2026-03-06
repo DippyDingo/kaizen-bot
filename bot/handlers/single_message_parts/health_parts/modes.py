@@ -37,6 +37,7 @@ async def cb_health_mode(callback: CallbackQuery, state) -> None:
         pending_sleep_exact_fell=None,
         pending_sleep_exact_wake=None,
         pending_workout_type=None,
+        pending_energy_level=None,
     )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer("Экран обновлен")

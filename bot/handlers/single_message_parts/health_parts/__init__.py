@@ -1,4 +1,4 @@
-from . import medications, modes, sleep, water, workouts  # noqa: F401
+from . import medications, modes, sleep, water, wellbeing, workouts  # noqa: F401
 from .builders import (
     HEALTH_MODE_MEDICATIONS,
     HEALTH_MODE_MEDICATION_CALENDAR,
@@ -13,6 +13,8 @@ from .builders import (
     HEALTH_MODE_SUMMARY_WEEK,
     HEALTH_MODE_WORKOUT_DURATION,
     HEALTH_MODE_WORKOUT_TYPE,
+    HEALTH_MODE_WELLBEING_ENERGY,
+    HEALTH_MODE_WELLBEING_STRESS,
     WORKOUT_TYPE_LABELS,
     WORKOUT_TYPE_SHORT,
     _build_health_keyboard,
@@ -43,6 +45,8 @@ __all__ = [
     "HEALTH_MODE_SUMMARY_WEEK",
     "HEALTH_MODE_WORKOUT_DURATION",
     "HEALTH_MODE_WORKOUT_TYPE",
+    "HEALTH_MODE_WELLBEING_ENERGY",
+    "HEALTH_MODE_WELLBEING_STRESS",
     "WORKOUT_TYPE_LABELS",
     "WORKOUT_TYPE_SHORT",
     "_build_health_keyboard",

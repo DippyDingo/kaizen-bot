@@ -2,6 +2,7 @@ from backend.services.health_parts import (
     _build_medication_calendar_marks,
     _build_medication_details,
     _build_medication_schedule_items,
+    _build_wellbeing_details,
     add_medication_log,
     add_sleep_log,
     add_water_log,
@@ -19,6 +20,8 @@ from backend.services.health_parts import (
     get_water_details_for_period,
     get_water_total_all_time,
     get_water_total_for_period,
+    get_wellbeing_details_for_period,
+    get_wellbeing_for_day,
     get_workout_details_for_period,
     list_day_medication_logs,
     list_medication_schedule_for_day,
@@ -27,12 +30,14 @@ from backend.services.health_parts import (
     remove_last_water_log,
     remove_last_workout_log,
     toggle_medication_intake_status,
+    upsert_wellbeing_log,
 )
 
 __all__ = [
     "_build_medication_calendar_marks",
     "_build_medication_details",
     "_build_medication_schedule_items",
+    "_build_wellbeing_details",
     "add_medication_log",
     "add_sleep_log",
     "add_water_log",
@@ -50,6 +55,8 @@ __all__ = [
     "get_water_details_for_period",
     "get_water_total_all_time",
     "get_water_total_for_period",
+    "get_wellbeing_details_for_period",
+    "get_wellbeing_for_day",
     "get_workout_details_for_period",
     "list_day_medication_logs",
     "list_medication_schedule_for_day",
@@ -58,4 +65,5 @@ __all__ = [
     "remove_last_water_log",
     "remove_last_workout_log",
     "toggle_medication_intake_status",
+    "upsert_wellbeing_log",
 ]

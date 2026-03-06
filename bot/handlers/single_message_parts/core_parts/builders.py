@@ -233,6 +233,12 @@ def _build_home_text(
     return "\n".join(lines)
 
 
+def _format_stat_day(value: date | None) -> str:
+    if value is None:
+        return "нет данных"
+    return value.strftime("%d.%m.%Y")
+
+
 def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: date, notice: str | None) -> str:
     period = str(stats["period"])
     tasks_total = stats["tasks_total"]
@@ -253,6 +259,7 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
     water_details = stats["water_details"]
     sleep_details = stats["sleep_details"]
     workout_details = stats["workout_details"]
+    wellbeing_details = stats["wellbeing_details"]
     medication_details = stats["medication_details"]
     diary_details = stats["diary_details"]
     task_bar = _build_metric_bar("tasks", completion_percent)
@@ -264,6 +271,12 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
     diary_bar = _build_metric_bar("diary", diary_active_percent)
     sleep_quality_percent = _clamp_percent((avg_sleep_quality / 5) * 100 if avg_sleep_quality else 0)
     sleep_quality_bar = _build_metric_bar("quality", sleep_quality_percent)
+    avg_energy = float(wellbeing_details["avg_energy"])
+    avg_stress = float(wellbeing_details["avg_stress"])
+    energy_percent = _clamp_percent((avg_energy / 5) * 100 if avg_energy else 0)
+    stress_percent = _clamp_percent((avg_stress / 5) * 100 if avg_stress else 0)
+    energy_bar = _build_metric_bar("energy", energy_percent)
+    stress_bar = _build_metric_bar("stress", stress_percent)
 
     if period == "all":
         title = "📈 СТАТИСТИКА ЗА ВСЕ ВРЕМЯ"
@@ -328,6 +341,14 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
         f"• Активных дней: <b>{medication_details['active_days']}</b>",
         f"• Лучший день: <b>{medication_details['best_day_logs']}</b> прием(ов)",
         f"• Чаще всего: <b>{html.escape(str(medication_details['top_title']))}</b>" if medication_details["top_title"] else "• Чаще всего: <b>нет данных</b>",
+        "",
+        "<b>Состояние</b>",
+        f"• Записей: <b>{wellbeing_details['entries_count']}</b>",
+        f"• {_build_bar_caption('Энергия', energy_bar, f'{avg_energy:.1f}/5')}" if avg_energy else f"• {_build_bar_caption('Энергия', _build_metric_bar('energy', 0), 'нет данных')}",
+        f"• {_build_bar_caption('Стресс', stress_bar, f'{avg_stress:.1f}/5')}" if avg_stress else f"• {_build_bar_caption('Стресс', _build_metric_bar('stress', 0), 'нет данных')}",
+        f"• Активных дней: <b>{wellbeing_details['active_days']}</b>",
+        f"• Лучший день по энергии: <b>{_format_stat_day(wellbeing_details['best_energy_day'])}</b>",
+        f"• Самый стрессовый день: <b>{_format_stat_day(wellbeing_details['highest_stress_day'])}</b>",
         "",
         "<b>Дневник</b>",
         f"• Записей: <b>{diary_total}</b>",

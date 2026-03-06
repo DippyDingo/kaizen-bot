@@ -108,4 +108,6 @@ BAR_FILLED: dict[str, str] = {
     "workout": "🟧",
     "diary": "🟪",
     "quality": "🟫",
+    "energy": "🟨",
+    "stress": "🟥",
 }
