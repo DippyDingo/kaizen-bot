@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import html
 import re
@@ -111,20 +111,13 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
     rows: list[list[InlineKeyboardButton]] = [
         _date_nav_row(selected_date),
         [
-            InlineKeyboardButton(text="• День" if mode == HEALTH_MODE_SUMMARY_DAY else "День", callback_data="health:mode:day"),
-            InlineKeyboardButton(text="• Неделя" if mode == HEALTH_MODE_SUMMARY_WEEK else "Неделя", callback_data="health:mode:week"),
             InlineKeyboardButton(
-                text="• Лекарства"
-                if mode in {
-                    HEALTH_MODE_MEDICATIONS,
-                    HEALTH_MODE_MEDICATION_CALENDAR,
-                    HEALTH_MODE_MEDICATION_TITLE,
-                    HEALTH_MODE_MEDICATION_DOSE,
-                    HEALTH_MODE_MEDICATION_TIME,
-                    HEALTH_MODE_MEDICATION_DAYS,
-                }
-                else "Лекарства",
-                callback_data="health:mode:meds",
+                text="• День" if mode == HEALTH_MODE_SUMMARY_DAY else "День",
+                callback_data="health:mode:day",
+            ),
+            InlineKeyboardButton(
+                text="• Неделя" if mode == HEALTH_MODE_SUMMARY_WEEK else "Неделя",
+                callback_data="health:mode:week",
             ),
         ],
     ]
@@ -135,7 +128,7 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
                 [InlineKeyboardButton(text="5ч", callback_data="sleep:dur:300"), InlineKeyboardButton(text="6ч", callback_data="sleep:dur:360"), InlineKeyboardButton(text="7ч", callback_data="sleep:dur:420")],
                 [InlineKeyboardButton(text="8ч", callback_data="sleep:dur:480"), InlineKeyboardButton(text="9ч", callback_data="sleep:dur:540"), InlineKeyboardButton(text="10ч", callback_data="sleep:dur:600")],
                 [InlineKeyboardButton(text="🕒 Точное время", callback_data="sleep:exact")],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="sleep:cancel")],
+                [InlineKeyboardButton(text="↩️", callback_data="sleep:cancel")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -144,21 +137,21 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
         rows.extend(
             [
                 [InlineKeyboardButton(text=SLEEP_QUALITY_LABELS[quality], callback_data=f"sleep:quality:{quality}") for quality in (1, 2, 3, 4, 5)],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="sleep:back")],
+                [InlineKeyboardButton(text="↩️", callback_data="sleep:back")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_SLEEP_EXACT:
-        rows.extend([[InlineKeyboardButton(text="↩️ Назад", callback_data="sleep:exact:cancel")]])
+        rows.extend([[InlineKeyboardButton(text="↩️", callback_data="sleep:exact:cancel")]])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_MEDICATION_TITLE:
-        rows.extend([[InlineKeyboardButton(text="↩️ Назад", callback_data="med:cancel")]])
+        rows.extend([[InlineKeyboardButton(text="↩️", callback_data="med:cancel")]])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_MEDICATION_DOSE:
-        rows.extend([[InlineKeyboardButton(text="↩️ Назад", callback_data="med:back")]])
+        rows.extend([[InlineKeyboardButton(text="↩️", callback_data="med:back")]])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_MEDICATION_TIME:
@@ -166,8 +159,8 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
             [
                 [InlineKeyboardButton(text="08:00", callback_data="med:time:08:00"), InlineKeyboardButton(text="13:00", callback_data="med:time:13:00")],
                 [InlineKeyboardButton(text="20:00", callback_data="med:time:20:00"), InlineKeyboardButton(text="22:00", callback_data="med:time:22:00")],
-                [InlineKeyboardButton(text="⌨️ Свое время", callback_data="med:time:custom")],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="med:time:back")],
+                [InlineKeyboardButton(text="⌨️ Своё время", callback_data="med:time:custom")],
+                [InlineKeyboardButton(text="↩️", callback_data="med:time:back")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -177,26 +170,51 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
             [
                 [InlineKeyboardButton(text="3 дня", callback_data="med:days:3"), InlineKeyboardButton(text="5 дней", callback_data="med:days:5")],
                 [InlineKeyboardButton(text="7 дней", callback_data="med:days:7"), InlineKeyboardButton(text="14 дней", callback_data="med:days:14")],
-                [InlineKeyboardButton(text="30 дней", callback_data="med:days:30"), InlineKeyboardButton(text="⌨️ Свое число", callback_data="med:days:custom")],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="med:days:back")],
+                [InlineKeyboardButton(text="30 дней", callback_data="med:days:30"), InlineKeyboardButton(text="⌨️ Своё число", callback_data="med:days:custom")],
+                [InlineKeyboardButton(text="↩️", callback_data="med:days:back")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_MEDICATIONS:
-        rows.extend([[InlineKeyboardButton(text="➕ Курс", callback_data="med:plan:start"), InlineKeyboardButton(text="📅 Календарь", callback_data="med:calendar")]])
+        rows.extend(
+            [
+                [InlineKeyboardButton(text="➕ Курс", callback_data="med:plan:start"), InlineKeyboardButton(text="📅 Календарь", callback_data="med:calendar")],
+            ]
+        )
         medication_schedule = list(summary.get("medication_schedule", []))
         for item in medication_schedule:
             course_id = int(item["course_id"])
             title = _short_medication(f"{item['intake_time']} {item['title']}", limit=26)
             status = str(item["status"])
-            rows.append([InlineKeyboardButton(text=title, callback_data=f"med:item:{course_id}"), InlineKeyboardButton(text="🗑", callback_data=f"med:delete:{course_id}")])
+            rows.append(
+                [
+                    InlineKeyboardButton(text=title, callback_data=f"med:item:{course_id}"),
+                    InlineKeyboardButton(text="🗑", callback_data=f"med:delete:{course_id}"),
+                ]
+            )
             if status == "taken":
-                rows.append([InlineKeyboardButton(text="↩️ Вернуть", callback_data=f"med:toggle:{course_id}:taken"), InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped")])
+                rows.append(
+                    [
+                        InlineKeyboardButton(text="↩️", callback_data=f"med:toggle:{course_id}:taken"),
+                        InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped"),
+                    ]
+                )
             elif status == "skipped":
-                rows.append([InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"), InlineKeyboardButton(text="↩️ Вернуть", callback_data=f"med:toggle:{course_id}:skipped")])
+                rows.append(
+                    [
+                        InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"),
+                        InlineKeyboardButton(text="↩️", callback_data=f"med:toggle:{course_id}:skipped"),
+                    ]
+                )
             else:
-                rows.append([InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"), InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped")])
+                rows.append(
+                    [
+                        InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"),
+                        InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped"),
+                    ]
+                )
+        rows.append([InlineKeyboardButton(text="↩️", callback_data="med:close")])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     if mode == HEALTH_MODE_WORKOUT_TYPE:
@@ -204,7 +222,7 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
             [
                 [InlineKeyboardButton(text=WORKOUT_TYPE_LABELS["strength"], callback_data="workout:type:strength"), InlineKeyboardButton(text=WORKOUT_TYPE_LABELS["cardio"], callback_data="workout:type:cardio")],
                 [InlineKeyboardButton(text=WORKOUT_TYPE_LABELS["mobility"], callback_data="workout:type:mobility")],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="workout:cancel")],
+                [InlineKeyboardButton(text="↩️", callback_data="workout:cancel")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -214,27 +232,32 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
             [
                 [InlineKeyboardButton(text="15м", callback_data="workout:dur:15"), InlineKeyboardButton(text="30м", callback_data="workout:dur:30")],
                 [InlineKeyboardButton(text="45м", callback_data="workout:dur:45"), InlineKeyboardButton(text="60м", callback_data="workout:dur:60")],
-                [InlineKeyboardButton(text="⌨️ Свое время", callback_data="workout:custom")],
-                [InlineKeyboardButton(text="↩️ Назад", callback_data="workout:back")],
+                [InlineKeyboardButton(text="⌨️ Своё время", callback_data="workout:custom")],
+                [InlineKeyboardButton(text="↩️", callback_data="workout:back")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
     rows.extend(
         [
-            [InlineKeyboardButton(text="💧150", callback_data="water:150"), InlineKeyboardButton(text="💧250", callback_data="water:250"), InlineKeyboardButton(text="💧500", callback_data="water:500")],
-            [InlineKeyboardButton(text="↩️ Вода", callback_data="water:undo")],
-            [InlineKeyboardButton(text="😴 Добавить сон", callback_data="sleep:start")],
-            [InlineKeyboardButton(text="↩️ Сон", callback_data="sleep:undo")],
-            [InlineKeyboardButton(text="💊 Лекарства", callback_data="health:mode:meds")],
-            [InlineKeyboardButton(text="🏃 Добавить тренировку", callback_data="workout:start")],
-            [InlineKeyboardButton(text="↩️ Тренировка", callback_data="workout:undo")],
+            [InlineKeyboardButton(text="😴 Добавить сон", callback_data="sleep:start"), InlineKeyboardButton(text="↩️", callback_data="sleep:undo")],
+            [InlineKeyboardButton(text="🏃 Добавить тренировку", callback_data="workout:start"), InlineKeyboardButton(text="↩️", callback_data="workout:undo")],
+            [InlineKeyboardButton(text="💧 Вода", callback_data="health:water"), InlineKeyboardButton(text="💊 Лекарства", callback_data="health:mode:meds")],
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, notice: str | None, *, mode: str = HEALTH_MODE_SUMMARY_DAY, pending_sleep_minutes: int | None = None, summary: dict | None = None) -> str:
+def _build_health_text(
+    water_ml: int,
+    sleep_minutes: int,
+    selected_date: date,
+    notice: str | None,
+    *,
+    mode: str = HEALTH_MODE_SUMMARY_DAY,
+    pending_sleep_minutes: int | None = None,
+    summary: dict | None = None,
+) -> str:
     summary = summary or {}
     water_target_ml = int(summary.get("daily_water_target_ml", DAILY_WATER_TARGET_ML))
     workout_target_min = int(summary.get("daily_workout_target_min", DAILY_WORKOUT_TARGET_MIN))
@@ -275,10 +298,23 @@ def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, n
         if medication_schedule:
             lines.append("<b>На этот день</b>")
             for item in medication_schedule:
-                lines.append("• " f"{_medication_status_icon(str(item['status']))} " f"<b>{html.escape(str(item['intake_time']))}</b> " f"{html.escape(str(item['title']))} - {html.escape(str(item['dose']))}")
-                lines.append(f"  Курс: {item['start_date'].strftime('%d.%m')} - {item['end_date'].strftime('%d.%m')} | осталось {item['days_left']} дн.")
+                lines.append(
+                    "• "
+                    f"{_medication_status_icon(str(item['status']))} "
+                    f"<b>{html.escape(str(item['intake_time']))}</b> "
+                    f"{html.escape(str(item['title']))} - {html.escape(str(item['dose']))}"
+                )
+                lines.append(
+                    f"  Курс: {item['start_date'].strftime('%d.%m')} - {item['end_date'].strftime('%d.%m')} | осталось {item['days_left']} дн."
+                )
         else:
-            lines.extend(["<b>На этот день</b>", "• Нет активных курсов.", "• Выбери дату стрелками или открой календарь."])
+            lines.extend(
+                [
+                    "<b>На этот день</b>",
+                    "• Нет активных курсов.",
+                    "• Выбери дату стрелками или открой календарь.",
+                ]
+            )
     elif mode == HEALTH_MODE_SUMMARY_WEEK:
         lines = [
             "<b>❤️ ЗДОРОВЬЕ • НЕДЕЛЯ</b>",
@@ -295,7 +331,7 @@ def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, n
             f"• Сумма: <b>{_format_minutes(week_sleep_total)}</b>",
             f"• {_build_bar_caption('Сон', week_sleep_bar, f'{week_sleep_percent}%')}",
             f"• Среднее: <b>{_format_minutes(int(summary.get('week_sleep_avg', 0)))}/д</b>",
-            (f"• Качество: <b>{float(summary.get('week_avg_quality', 0)):.1f}/5</b>" if summary.get("week_avg_quality", 0) else "• Качество: <b>нет данных</b>"),
+            f"• Качество: <b>{float(summary.get('week_avg_quality', 0)):.1f}/5</b>" if summary.get("week_avg_quality", 0) else "• Качество: <b>нет данных</b>",
             f"• Активных дней: <b>{summary.get('week_sleep_active_days', 0)}/7</b>",
             f"• Лучший день: <b>{_format_minutes(int(summary.get('week_best_sleep_day', 0)))}</b>",
             "",
@@ -306,15 +342,15 @@ def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, n
             f"• Сессий: <b>{summary.get('week_workout_sessions', 0)}</b>",
             f"• Активных дней: <b>{summary.get('week_workout_active_days', 0)}/7</b>",
             f"• Лучший день: <b>{_format_minutes(int(summary.get('week_best_workout_day', 0)))}</b>",
-            (f"• По типам: <b>💪 {summary.get('week_strength_count', 0)}</b> | <b>🏃 {summary.get('week_cardio_count', 0)}</b> | <b>🧘 {summary.get('week_mobility_count', 0)}</b>"),
-            (f"• Минуты по типам: <b>💪 {summary.get('week_strength_minutes', 0)}</b> | <b>🏃 {summary.get('week_cardio_minutes', 0)}</b> | <b>🧘 {summary.get('week_mobility_minutes', 0)}</b>"),
+            f"• По типам: <b>💪 {summary.get('week_strength_count', 0)}</b> | <b>🏃 {summary.get('week_cardio_count', 0)}</b> | <b>🧘 {summary.get('week_mobility_count', 0)}</b>",
+            f"• Минуты по типам: <b>💪 {summary.get('week_strength_minutes', 0)}</b> | <b>🏃 {summary.get('week_cardio_minutes', 0)}</b> | <b>🧘 {summary.get('week_mobility_minutes', 0)}</b>",
             "",
             "<b>💊 Лекарства</b>",
-            f"• Приемов: <b>{week_medication_total}</b>",
+            f"• Приёмов: <b>{week_medication_total}</b>",
             f"• Активных дней: <b>{summary.get('week_medication_active_days', 0)}/7</b>",
             f"• Уникальных: <b>{summary.get('week_medication_unique', 0)}</b>",
-            f"• Лучший день: <b>{summary.get('week_best_medication_day', 0)}</b> прием(ов)",
-            (f"• Чаще всего: <b>{html.escape(str(summary.get('week_top_medication_title')))}</b>" if summary.get("week_top_medication_title") else "• Чаще всего: <b>нет данных</b>"),
+            f"• Лучший день: <b>{summary.get('week_best_medication_day', 0)}</b> приём(ов)",
+            f"• Чаще всего: <b>{html.escape(str(summary.get('week_top_medication_title')))}</b>" if summary.get("week_top_medication_title") else "• Чаще всего: <b>нет данных</b>",
         ]
     else:
         lines = [
@@ -331,11 +367,12 @@ def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, n
             f"• {_build_bar_caption('Тренировки', day_workout_bar, f'{day_workout_percent}%')}",
             f"• 💊 Лекарства: <b>{day_medication_total}</b>",
             f"• Уникальных: <b>{day_medication_unique}</b>",
-            (f"• ⭐ Качество сна: <b>{day_quality:.1f}/5</b>" if day_quality else "• ⭐ Качество сна: <b>нет данных</b>"),
+            f"• ⭐ Качество сна: <b>{day_quality:.1f}/5</b>" if day_quality else "• ⭐ Качество сна: <b>нет данных</b>",
             "",
             "<b>Быстрые действия</b>",
-            "• вода, сон и тренировки добавляются кнопками ниже",
-            "• лекарства ведутся в отдельном окне `Лекарства`",
+            "• вода ведется в отдельной вкладке `Вода`",
+            "• сон и тренировки добавляются кнопками ниже",
+            "• лекарства ведутся в отдельном окне",
         ]
 
     if mode == HEALTH_MODE_SLEEP_DURATION:
@@ -344,20 +381,20 @@ def _build_health_text(water_ml: int, sleep_minutes: int, selected_date: date, n
         duration_label = _sleep_duration_label(pending_sleep_minutes or 0)
         lines.extend(["", "<b>Качество сна</b>", f"Длительность: <b>{duration_label}</b>", "Оцени качество по шкале 1-5."])
     elif mode == HEALTH_MODE_SLEEP_EXACT:
-        lines.extend(["", "<b>Точное время сна</b>", "Отправь время сна в формате:", "<b>23:40 07:15</b>", "или", "<b>23:40-07:15</b>", "Первое время — засыпание, второе — подъем.", "Если время засыпания позже времени подъема, бот считает, что ты уснул накануне."])
+        lines.extend(["", "<b>Точное время сна</b>", "Отправь время сна в формате:", "<b>23:40 07:15</b>", "или", "<b>23:40-07:15</b>", "Первое время — засыпание, второе — подъём.", "Если время засыпания позже времени подъёма, бот считает, что ты уснул накануне."])
     elif mode == HEALTH_MODE_WORKOUT_TYPE:
         lines.extend(["", "<b>Добавление тренировки</b>", "Выбери тип тренировки."])
     elif mode == HEALTH_MODE_WORKOUT_DURATION:
         workout_type = str(summary.get("pending_workout_type") or "")
         workout_label = WORKOUT_TYPE_LABELS.get(workout_type, "Тренировка")
-        lines.extend(["", "<b>Добавление тренировки</b>", f"Тип: <b>{workout_label}</b>", "Выбери длительность или нажми `Свое время`."])
+        lines.extend(["", "<b>Добавление тренировки</b>", f"Тип: <b>{workout_label}</b>", "Выбери длительность или нажми `Своё время`."])
     elif mode == HEALTH_MODE_MEDICATION_TITLE:
         lines.extend(["", "<b>Добавление лекарства</b>", "Напиши название лекарства."])
     elif mode == HEALTH_MODE_MEDICATION_DOSE:
         medication_title = str(summary.get("pending_medication_title") or "Лекарство")
         lines.extend(["", "<b>Добавление лекарства</b>", f"Название: <b>{html.escape(medication_title)}</b>", "Напиши дозу. Пример: <b>1 таблетка</b> или <b>200 мг</b>."])
     elif mode == HEALTH_MODE_MEDICATION_TIME:
-        lines.extend(["", "<b>Время приема</b>", f"Лекарство: <b>{html.escape(str(summary.get('pending_medication_title') or 'Лекарство'))}</b>", "Выбери время кнопкой или отправь свое в формате <b>08:30</b>."])
+        lines.extend(["", "<b>Время приёма</b>", f"Лекарство: <b>{html.escape(str(summary.get('pending_medication_title') or 'Лекарство'))}</b>", "Выбери время кнопкой или отправь своё в формате <b>08:30</b>."])
     elif mode == HEALTH_MODE_MEDICATION_DAYS:
         pending_time = str(summary.get("pending_medication_time") or "--:--")
         lines.extend(["", "<b>Длительность курса</b>", f"Старт: <b>{selected_date.strftime('%d.%m.%Y')}</b>", f"Время: <b>{html.escape(pending_time)}</b>", "Выбери, сколько дней пить лекарство."])
@@ -396,3 +433,4 @@ def _parse_exact_sleep_input(raw_text: str, target_day: date) -> tuple[datetime,
     if woke_up_at <= fell_asleep_at:
         return None
     return fell_asleep_at, woke_up_at
+

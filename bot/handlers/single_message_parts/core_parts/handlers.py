@@ -18,7 +18,7 @@ from backend.services.user_service import (
 )
 from bot.states import DashboardStates
 
-from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_HOME, VIEW_PROFILE, VIEW_SETTINGS, VIEW_STATS, VIEW_TASKS, _month_start, _render, _reset_context, _setup_chat_ui, router
+from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_HOME, VIEW_PROFILE, VIEW_SETTINGS, VIEW_STATS, VIEW_TASKS, VIEW_WATER, _month_start, _render, _reset_context, _setup_chat_ui, router
 from .builders import STATS_PERIOD_LABELS, _maybe_start_name_onboarding, _render_command_view, _resolve_cancel_view
 
 
@@ -249,6 +249,11 @@ async def cmd_health(message: Message, state: FSMContext) -> None:
     await _render_command_view(message, state, VIEW_HEALTH)
 
 
+@router.message(Command("water"))
+async def cmd_water(message: Message, state: FSMContext) -> None:
+    await _render_command_view(message, state, VIEW_WATER)
+
+
 @router.message(Command("diary"))
 async def cmd_diary(message: Message, state: FSMContext) -> None:
     await _render_command_view(message, state, VIEW_DIARY)
@@ -321,6 +326,13 @@ async def cb_view_health(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "view:water")
+async def cb_view_water(callback: CallbackQuery, state: FSMContext) -> None:
+    await _reset_context(state, view_mode=VIEW_WATER)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("stats:period:"))
 async def cb_stats_period(callback: CallbackQuery, state: FSMContext) -> None:
     try:
@@ -342,6 +354,7 @@ async def cb_stats_period(callback: CallbackQuery, state: FSMContext) -> None:
 async def fallback(message: Message, state: FSMContext) -> None:
     if await state.get_state() not in {
         DashboardStates.waiting_display_name.state,
+        DashboardStates.waiting_water_amount_text.state,
         DashboardStates.waiting_sleep_exact_time.state,
         DashboardStates.waiting_medication_title.state,
         DashboardStates.waiting_medication_dose.state,

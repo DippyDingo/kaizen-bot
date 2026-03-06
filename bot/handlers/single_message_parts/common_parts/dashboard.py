@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from backend.database import async_session
 from backend.services.diary_service import list_day_diary_entries
 from backend.services.health_service import get_medication_calendar_marks, list_medication_schedule_for_day
+from backend.services.user_service import get_or_create_user, set_user_dashboard_message_ref
 from bot.states import DashboardStates
 
 from .chat_ui import _ensure_chat_keyboard
@@ -25,9 +26,91 @@ from .constants import (
     VIEW_SETTINGS,
     VIEW_STATS,
     VIEW_TASKS,
+    VIEW_WATER,
 )
 from .data import _load_health_summary, _load_user_and_metrics, _load_user_period_stats
 from .helpers import _month_start, _parse_iso_date
+
+
+def _is_message_not_modified(exc: TelegramBadRequest) -> bool:
+    return "message is not modified" in str(exc).lower()
+
+
+async def _persist_dashboard_ref(state: FSMContext, from_user, chat_id: int, message_id: int) -> None:
+    await state.update_data(dashboard_chat_id=chat_id, dashboard_message_id=message_id)
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=from_user.id,
+            first_name=from_user.first_name,
+            username=from_user.username,
+            last_name=from_user.last_name,
+        )
+        await set_user_dashboard_message_ref(
+            session,
+            user,
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+
+
+async def _clear_dashboard_ref(state: FSMContext, from_user) -> None:
+    await state.update_data(dashboard_chat_id=None, dashboard_message_id=None)
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=from_user.id,
+            first_name=from_user.first_name,
+            username=from_user.username,
+            last_name=from_user.last_name,
+        )
+        await set_user_dashboard_message_ref(
+            session,
+            user,
+            chat_id=None,
+            message_id=None,
+        )
+
+
+async def _resolve_dashboard_target(message: Message, state: FSMContext) -> tuple[int, int] | None:
+    data = await state.get_data()
+    chat_id = data.get("dashboard_chat_id")
+    message_id = data.get("dashboard_message_id")
+    if isinstance(chat_id, int) and isinstance(message_id, int):
+        return chat_id, message_id
+
+    key = (message.chat.id, message.from_user.id)
+    target = DASHBOARD_MESSAGES.get(key)
+    if target:
+        return target
+
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+        if user.dashboard_chat_id and user.dashboard_message_id:
+            return int(user.dashboard_chat_id), int(user.dashboard_message_id)
+
+    return None
+
+
+async def _relocate_dashboard_message(message: Message, state: FSMContext) -> None:
+    target = await _resolve_dashboard_target(message, state)
+    key = (message.chat.id, message.from_user.id)
+
+    if target:
+        chat_id, message_id = target
+        try:
+            await message.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except TelegramBadRequest:
+            pass
+
+    DASHBOARD_MESSAGES.pop(key, None)
+    await _clear_dashboard_ref(state, message.from_user)
 
 
 async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard: InlineKeyboardMarkup) -> None:
@@ -38,13 +121,13 @@ async def _edit_dashboard_callback(callback: CallbackQuery, text: str, keyboard:
     try:
         await callback.message.edit_text(text=text, reply_markup=keyboard)
     except TelegramBadRequest as exc:
-        if "message is not modified" not in str(exc).lower():
+        if not _is_message_not_modified(exc):
             raise
 
 
-async def _upsert_dashboard_message(message: Message, text: str, keyboard: InlineKeyboardMarkup) -> None:
+async def _upsert_dashboard_message(message: Message, state: FSMContext, text: str, keyboard: InlineKeyboardMarkup) -> None:
     key = (message.chat.id, message.from_user.id)
-    target = DASHBOARD_MESSAGES.get(key)
+    target = await _resolve_dashboard_target(message, state)
 
     if target:
         chat_id, message_id = target
@@ -55,12 +138,18 @@ async def _upsert_dashboard_message(message: Message, text: str, keyboard: Inlin
                 text=text,
                 reply_markup=keyboard,
             )
+            DASHBOARD_MESSAGES[key] = (chat_id, message_id)
+            await state.update_data(dashboard_chat_id=chat_id, dashboard_message_id=message_id)
             return
-        except TelegramBadRequest:
-            pass
+        except TelegramBadRequest as exc:
+            if _is_message_not_modified(exc):
+                DASHBOARD_MESSAGES[key] = (chat_id, message_id)
+                await state.update_data(dashboard_chat_id=chat_id, dashboard_message_id=message_id)
+                return
 
     sent = await message.answer(text=text, reply_markup=keyboard)
     DASHBOARD_MESSAGES[key] = (sent.chat.id, sent.message_id)
+    await _persist_dashboard_ref(state, message.from_user, sent.chat.id, sent.message_id)
 
 
 async def _remember_output_message(state: FSMContext, bot_message: Message) -> None:
@@ -96,6 +185,8 @@ async def _reset_context(state: FSMContext, *, view_mode: str | None = None) -> 
     selected_date = _parse_iso_date(data.get("selected_date"), date.today())
     calendar_month = _parse_iso_date(data.get("calendar_month"), _month_start(selected_date))
     output_message_ids = list(data.get("output_message_ids", []))
+    dashboard_chat_id = data.get("dashboard_chat_id")
+    dashboard_message_id = data.get("dashboard_message_id")
     old_view = data.get("view_mode", VIEW_HOME)
     await state.clear()
     resolved_view = view_mode or old_view
@@ -104,6 +195,8 @@ async def _reset_context(state: FSMContext, *, view_mode: str | None = None) -> 
         calendar_month=calendar_month.isoformat(),
         view_mode=resolved_view,
         output_message_ids=output_message_ids,
+        dashboard_chat_id=dashboard_chat_id,
+        dashboard_message_id=dashboard_message_id,
     )
     return selected_date, calendar_month, resolved_view
 
@@ -134,6 +227,7 @@ async def _render(
         _build_health_text,
     )
     from ..tasks import _build_priority_keyboard, _build_tasks_keyboard, _build_tasks_text
+    from ..water import _build_water_keyboard, _build_water_text
 
     data = await state.get_data()
     selected_date = _parse_iso_date(data.get("selected_date"), date.today())
@@ -151,6 +245,9 @@ async def _render(
     if current_state == DashboardStates.waiting_task_title.state:
         text = _build_tasks_text(tasks, selected_date, "wait_title", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_tasks_keyboard(tasks, selected_date)
+    elif current_state == DashboardStates.waiting_water_amount_text.state:
+        text = _build_water_text(user, water_ml, selected_date, notice, mode="wait_amount")
+        keyboard = _build_water_keyboard(selected_date, mode="wait_amount")
     elif current_state == DashboardStates.waiting_display_name.state:
         text = _build_profile_text(user, mode="wait_name", notice=notice)
         keyboard = _build_profile_keyboard(editing=True)
@@ -249,6 +346,9 @@ async def _render(
                 summary=health_summary,
             )
             keyboard = _build_health_keyboard(selected_date, mode=health_mode, summary=health_summary)
+    elif view_mode == VIEW_WATER:
+        text = _build_water_text(user, water_ml, selected_date, notice)
+        keyboard = _build_water_keyboard(selected_date)
     elif view_mode == VIEW_DIARY and diary_calendar_mode:
         text = _build_diary_calendar_text(selected_date, notice)
         keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="diary")
@@ -260,9 +360,10 @@ async def _render(
         keyboard = _home_keyboard()
 
     if callback:
+        await _persist_dashboard_ref(state, callback.from_user, callback.message.chat.id, callback.message.message_id)
         await _edit_dashboard_callback(callback, text, keyboard)
     elif message:
-        await _upsert_dashboard_message(message, text, keyboard)
+        await _upsert_dashboard_message(message, state, text, keyboard)
 
 
 async def _send_diary_entry_to_chat(message: Message, entry, state: FSMContext | None = None) -> bool:

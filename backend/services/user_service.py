@@ -59,3 +59,17 @@ async def set_user_daily_workout_target(session: AsyncSession, user: User, daily
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def set_user_dashboard_message_ref(
+    session: AsyncSession,
+    user: User,
+    *,
+    chat_id: int | None,
+    message_id: int | None,
+) -> User:
+    user.dashboard_chat_id = chat_id
+    user.dashboard_message_id = message_id
+    await session.commit()
+    await session.refresh(user)
+    return user

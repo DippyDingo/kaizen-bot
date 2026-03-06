@@ -19,6 +19,7 @@ from .common_parts.constants import (
     CHAT_BUTTON_SETTINGS,
     CHAT_BUTTON_STATS,
     CHAT_BUTTON_TASKS,
+    CHAT_BUTTON_WATER,
     CHAT_KEYBOARD_MESSAGES,
     CHAT_NAVIGATION,
     CLEARED_COMMAND_CHATS,
@@ -44,6 +45,7 @@ from .common_parts.constants import (
     VIEW_SETTINGS,
     VIEW_STATS,
     VIEW_TASKS,
+    VIEW_WATER,
     WEBAPP_BUTTON_TEXT,
     WEEKDAY_LABELS,
     WEEKDAY_NAMES_LONG,
@@ -51,9 +53,11 @@ from .common_parts.constants import (
 )
 from .common_parts.dashboard import (
     _clear_output_messages,
+    _clear_dashboard_ref,
     _edit_dashboard_callback,
     _remember_output_message,
     _render,
+    _relocate_dashboard_message,
     _reset_context,
     _send_diary_entry_to_chat,
     _upsert_dashboard_message,

@@ -1,4 +1,4 @@
-from datetime import date
+﻿from datetime import date
 
 from aiogram import F
 from aiogram.exceptions import TelegramBadRequest
@@ -11,21 +11,52 @@ from backend.services.user_service import get_or_create_user
 from bot.states import DashboardStates
 
 from ..common import VIEW_HEALTH, _parse_iso_date, _render, router
-from .builders import HEALTH_MODE_MEDICATIONS, HEALTH_MODE_MEDICATION_CALENDAR, HEALTH_MODE_MEDICATION_TITLE, HEALTH_MODE_MEDICATION_DOSE, HEALTH_MODE_MEDICATION_TIME, HEALTH_MODE_MEDICATION_DAYS, _parse_medication_days_input, _parse_medication_time_input, _short_medication
+from .builders import (
+    HEALTH_MODE_MEDICATIONS,
+    HEALTH_MODE_MEDICATION_CALENDAR,
+    HEALTH_MODE_MEDICATION_TITLE,
+    HEALTH_MODE_MEDICATION_DOSE,
+    HEALTH_MODE_MEDICATION_TIME,
+    HEALTH_MODE_MEDICATION_DAYS,
+    _parse_medication_days_input,
+    _parse_medication_time_input,
+    _short_medication,
+)
+
+
+def _summary_mode_from_data(data: dict) -> str:
+    raw = data.get("health_summary_mode")
+    return str(raw) if raw in {"summary_day", "summary_week"} else "summary_day"
 
 
 @router.callback_query(F.data == "med:plan:start")
 async def cb_med_start(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(DashboardStates.waiting_medication_title)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_TITLE, pending_medication_title=None, pending_medication_dose=None, pending_medication_time=None)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_MEDICATION_TITLE,
+        health_summary_mode=_summary_mode_from_data(data),
+        pending_medication_title=None,
+        pending_medication_dose=None,
+        pending_medication_time=None,
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer("Жду название")
 
 
 @router.callback_query(F.data == "med:cancel")
 async def cb_med_cancel(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(None)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATIONS, pending_medication_title=None, pending_medication_dose=None, pending_medication_time=None)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_MEDICATIONS,
+        health_summary_mode=_summary_mode_from_data(data),
+        pending_medication_title=None,
+        pending_medication_dose=None,
+        pending_medication_time=None,
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback, notice="Создание курса отменено")
     await callback.answer()
 
@@ -50,7 +81,7 @@ async def cb_med_time_back(callback: CallbackQuery, state) -> None:
 async def cb_med_days_back(callback: CallbackQuery, state) -> None:
     await state.set_state(None)
     await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_TIME)
-    await _render(from_user=callback.from_user, state=state, callback=callback, notice="Измени время приема.")
+    await _render(from_user=callback.from_user, state=state, callback=callback, notice="Измени время приёма.")
     await callback.answer()
 
 
@@ -93,7 +124,7 @@ async def msg_medication_dose(message: Message, state) -> None:
 
     await state.set_state(None)
     await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_TIME, pending_medication_title=title, pending_medication_dose=dose[:120])
-    await _render(from_user=message.from_user, state=state, message=message, notice=f"Доза сохранена: {dose[:40]}. Теперь выбери время приема.")
+    await _render(from_user=message.from_user, state=state, message=message, notice=f"Доза сохранена: {dose[:40]}. Теперь выбери время приёма.")
 
 
 @router.callback_query(F.data.startswith("med:time:"))
@@ -102,7 +133,7 @@ async def cb_med_time(callback: CallbackQuery, state) -> None:
     if suffix == "custom":
         await state.set_state(DashboardStates.waiting_medication_time_text)
         await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_TIME)
-        await _render(from_user=callback.from_user, state=state, callback=callback, notice="Отправь время приема в формате 08:30")
+        await _render(from_user=callback.from_user, state=state, callback=callback, notice="Отправь время приёма в формате 08:30")
         await callback.answer("Жду время")
         return
 
@@ -184,10 +215,24 @@ async def _finalize_medication_course(from_user, state, *, days_count: int, call
 
     async with async_session() as session:
         user, _ = await get_or_create_user(session=session, telegram_id=from_user.id, first_name=from_user.first_name, username=from_user.username, last_name=from_user.last_name)
-        course = await create_medication_course(session=session, user=user, title=title[:120], dose=dose[:120], intake_time=intake_time, start_date=selected_date, days_count=days_count)
+        course = await create_medication_course(
+            session=session,
+            user=user,
+            title=title[:120],
+            dose=dose[:120],
+            intake_time=intake_time,
+            start_date=selected_date,
+            days_count=days_count,
+        )
 
     await state.set_state(None)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATIONS, pending_medication_title=None, pending_medication_dose=None, pending_medication_time=None)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_MEDICATIONS,
+        pending_medication_title=None,
+        pending_medication_dose=None,
+        pending_medication_time=None,
+    )
     await _render(from_user=from_user, state=state, callback=callback, message=message, notice=f"Курс {_short_medication(course.title)} создан: {course.intake_time.strftime('%H:%M')} | {days_count} дн.")
 
 
@@ -195,6 +240,15 @@ async def _finalize_medication_course(from_user, state, *, days_count: int, call
 async def cb_med_calendar(callback: CallbackQuery, state) -> None:
     await state.set_state(None)
     await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_MEDICATION_CALENDAR)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "med:close")
+async def cb_med_close(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
+    await state.set_state(None)
+    await state.update_data(view_mode=VIEW_HEALTH, health_mode=_summary_mode_from_data(data))
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()
 
@@ -271,3 +325,4 @@ async def cb_med_delete(callback: CallbackQuery, state) -> None:
 @router.callback_query(F.data.startswith("med:item:"))
 async def cb_med_item(callback: CallbackQuery) -> None:
     await callback.answer("Используй кнопки ниже: выпил, пропуск или удалить курс.")
+

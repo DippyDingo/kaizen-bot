@@ -3,6 +3,7 @@
 import html
 from datetime import date
 
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
@@ -22,6 +23,7 @@ from ..common import (
     VIEW_PROFILE,
     VIEW_SETTINGS,
     VIEW_TASKS,
+    VIEW_WATER,
     _build_bar_caption,
     _build_companion_hint,
     _build_goal_bar,
@@ -32,6 +34,7 @@ from ..common import (
     _display_name,
     _format_long_date,
     _month_start,
+    _relocate_dashboard_message,
     _render,
     _reset_context,
     _setup_chat_ui,
@@ -62,6 +65,33 @@ def _home_keyboard() -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+def _home_focus_lines(tasks: list) -> list[str]:
+    if not tasks:
+        return ["• На сегодня задач нет"]
+
+    priority_order = {"high": 0, "medium": 1, "low": 2}
+    priority_badges = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+    pending_tasks = [task for task in tasks if not task.is_done]
+    if not pending_tasks:
+        return ["• Все задачи на сегодня закрыты"]
+
+    ordered = sorted(
+        pending_tasks,
+        key=lambda task: (priority_order.get(getattr(task, "priority", "low"), 3), getattr(task, "created_at", None) or 0),
+    )
+    lines: list[str] = []
+    for task in ordered[:3]:
+        badge = priority_badges.get(task.priority, "⚪")
+        title = html.escape(task.title.strip())
+        if len(title) > 46:
+            title = f"{title[:45]}…"
+        lines.append(f"• {badge} {title}")
+    remaining = len(ordered) - len(lines)
+    if remaining > 0:
+        lines.append(f"• И ещё {remaining}")
+    return lines
 
 
 def _build_stats_keyboard(selected_date: date, stats_period: str) -> InlineKeyboardMarkup:
@@ -154,34 +184,47 @@ def _build_home_text(
 ) -> str:
     total_tasks = len(tasks)
     done_count = sum(1 for t in tasks if t.is_done)
+    open_count = total_tasks - done_count
 
     hp_percent = _clamp_percent((done_count / total_tasks) * 100 if total_tasks else 0)
     hp_bar = _build_metric_bar("tasks", hp_percent)
 
     mana_bar, mana_steps = _build_mana_bar(water_ml, user.daily_water_target_ml)
+    water_percent = _clamp_percent((water_ml / user.daily_water_target_ml) * 100 if user.daily_water_target_ml else 0)
 
     stamina_percent = _clamp_percent((sleep_minutes / 480) * 100)
     stamina_bar = _build_metric_bar("sleep", stamina_percent)
+    sleep_label = _sleep_duration_text(sleep_minutes)
 
     companion_hint = _build_companion_hint(stamina_percent, water_ml, done_count, total_tasks)
+    focus_lines = _home_focus_lines(tasks)
     date_prefix = "Сегодня" if selected_date == date.today() else "Дата"
     lines = [
+        "<b>🏠 ГЛАВНАЯ</b>",
         f"📅 {date_prefix}: {_format_long_date(selected_date)}",
-        f"👤 {_display_name(user)} | Ур. {user.level} | ⭐ {user.exp}/{user.exp_to_next_level} EXP",
-        f"📍 Локация: {HOME_LOCATION_NAME} | 🔥 Streak: {user.current_streak} дней",
+        f"👤 <b>{html.escape(_display_name(user))}</b> · Ур. <b>{user.level}</b> · ⭐ <b>{user.exp}/{user.exp_to_next_level}</b>",
+        f"🔥 Серия: <b>{user.current_streak}</b> · 📍 {HOME_LOCATION_NAME}",
+        "",
+        "<b>Сегодня</b>",
+        f"• Задачи: <b>{done_count}/{total_tasks}</b>" if total_tasks else "• Задачи: <b>0</b>",
+        f"• Открыто: <b>{open_count}</b>",
+        f"• Вода: <b>{water_ml}/{user.daily_water_target_ml} мл</b>",
+        f"• Сон: <b>{sleep_label}</b>",
+        f"• Дневник: <b>{diary_count}</b>",
         "",
         _build_bar_caption("Ритм", hp_bar, f"{hp_percent}%", icon="❤️"),
-        _build_bar_caption("Вода", mana_bar, f"{mana_steps}/5", icon="💧"),
+        _build_bar_caption("Вода", mana_bar, f"{water_percent}%", icon="💧"),
         _build_bar_caption("Сон", stamina_bar, f"{stamina_percent}%", icon="⚡️"),
         "",
-        f"⚔️ Дуэль (Вода): Ты [{water_ml}мл] 🆚 {HOME_DUEL_OPPONENT} [{HOME_DUEL_OPPONENT_WATER_ML}мл]",
-        f"🎵 Трек: {HOME_TRACK_TITLE}",
-        f"📝 Дневник: {diary_count} запис(ей) за день",
+        "<b>Фокус дня</b>",
+        *focus_lines,
         "",
-        f"💬 Компаньон ({HOME_COMPANION_ROLE}):",
+        "<b>Контекст</b>",
+        f"• ⚔️ Дуэль воды: ты <b>{water_ml} мл</b> vs {HOME_DUEL_OPPONENT} <b>{HOME_DUEL_OPPONENT_WATER_ML} мл</b>",
+        f"• 🎵 Трек: {html.escape(HOME_TRACK_TITLE)}",
+        "",
+        f"<b>💬 {HOME_COMPANION_ROLE}</b>",
         f'"{companion_hint}"',
-        "",
-        "— [ Быстрые действия ] —",
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])
@@ -305,9 +348,25 @@ def _sleep_duration_text(minutes: int) -> str:
     return f"{hours} ч {minutes_part} м"
 
 
-async def _render_command_view(message: Message, state: FSMContext, view_mode: str, notice: str | None = None) -> None:
+async def _render_command_view(
+    message: Message,
+    state: FSMContext,
+    view_mode: str,
+    notice: str | None = None,
+    *,
+    delete_source_message: bool = False,
+    force_keyboard: bool = True,
+    relocate_dashboard: bool = False,
+) -> None:
     await _reset_context(state, view_mode=view_mode)
-    await _setup_chat_ui(message, force_keyboard=True)
+    await _setup_chat_ui(message, force_keyboard=force_keyboard)
+    if relocate_dashboard:
+        await _relocate_dashboard_message(message, state)
+    if delete_source_message:
+        try:
+            await message.delete()
+        except TelegramBadRequest:
+            pass
     await _render(from_user=message.from_user, state=state, message=message, notice=notice)
 
 
@@ -344,6 +403,8 @@ async def _maybe_start_name_onboarding(message: Message, state: FSMContext) -> b
 
 
 def _resolve_cancel_view(raw_state: str | None) -> str:
+    if raw_state == DashboardStates.waiting_water_amount_text.state:
+        return VIEW_WATER
     if raw_state == DashboardStates.waiting_display_name.state:
         return VIEW_PROFILE
     if raw_state == DashboardStates.waiting_sleep_exact_time.state:

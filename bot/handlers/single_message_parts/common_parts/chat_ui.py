@@ -138,13 +138,14 @@ async def _setup_chat_ui(message: Message, *, force_keyboard: bool = False, keyb
 
 @router.message(F.text.in_(tuple(CHAT_NAVIGATION)))
 async def msg_chat_navigation(message: Message, state: FSMContext) -> None:
-    from .dashboard import _render, _reset_context
-
     target_view = CHAT_NAVIGATION[(message.text or "").strip()]
-    await _reset_context(state, view_mode=target_view)
-    await _setup_chat_ui(message)
-    try:
-        await message.delete()
-    except TelegramBadRequest:
-        pass
-    await _render(from_user=message.from_user, state=state, message=message)
+    from ..core import _render_command_view
+
+    await _render_command_view(
+        message,
+        state,
+        target_view,
+        delete_source_message=True,
+        force_keyboard=False,
+        relocate_dashboard=True,
+    )

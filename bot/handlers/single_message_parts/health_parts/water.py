@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 
 from aiogram import F
 from aiogram.types import CallbackQuery
@@ -7,11 +7,22 @@ from backend.database import async_session
 from backend.services.health_service import add_water_log, remove_last_water_log
 from backend.services.user_service import get_or_create_user
 
-from ..common import _parse_iso_date, _render, router
+from ..common import VIEW_HEALTH, VIEW_HOME, VIEW_WATER, _parse_iso_date, _render, router
 from .state import _reset_health_mode
 
 
-@router.callback_query(F.data.startswith("water:"))
+async def _restore_after_water_action(state) -> None:
+    data = await state.get_data()
+    view_mode = data.get("view_mode", VIEW_HOME)
+    if view_mode != VIEW_HEALTH:
+        await state.set_state(None)
+        await state.update_data(view_mode=view_mode)
+        return
+
+    await _reset_health_mode(state)
+
+
+@router.callback_query(F.data.regexp(r"^water:(undo|\d+)$"))
 async def cb_water(callback: CallbackQuery, state) -> None:
     action = callback.data.split(":", 1)[1]
     if action == "undo":
@@ -38,7 +49,7 @@ async def cb_water(callback: CallbackQuery, state) -> None:
         )
         level_ups = await add_water_log(session, user, amount_ml, logged_at=logged_at)
 
-    await _reset_health_mode(state)
+    await _restore_after_water_action(state)
     notice = f"Добавлено {amount_ml} мл воды (+2 EXP)"
     if level_ups > 0:
         notice += f" | Уровень +{level_ups}"
@@ -61,10 +72,15 @@ async def _undo_water(callback: CallbackQuery, state) -> None:
         )
         amount_ml, level_change = await remove_last_water_log(session, user, selected_date)
 
-    await _reset_health_mode(state)
+    await _restore_after_water_action(state)
 
     if amount_ml is None:
-        await _render(from_user=callback.from_user, state=state, callback=callback, notice="За выбранный день нечего отменять.")
+        await _render(
+            from_user=callback.from_user,
+            state=state,
+            callback=callback,
+            notice="За выбранный день нечего отменять.",
+        )
         await callback.answer("Пусто")
         return
 

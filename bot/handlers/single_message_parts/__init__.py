@@ -4,5 +4,6 @@ from . import core as _core
 from . import diary as _diary
 from . import health as _health
 from . import tasks as _tasks
+from . import water as _water
 
 __all__ = ["router"]

@@ -628,3 +628,152 @@
 - Validation after cleanup:
   - `python -m compileall bot backend alembic tests` passed,
   - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Health UI Cleanup
+
+- Removed the `Лекарства` button from the top `День / Неделя` mode switch in the health screen.
+- Kept medications as a separate action entry in the health action area instead of mixing it into summary-mode tabs.
+- Made action rows more explicit in the daily summary:
+  - `Добавить сон` + `↩️ Сон`
+  - `Добавить тренировку` + `↩️ Тренировка`
+- Unified cancel/back labels inside health flows:
+  - `↩️ Отмена` for flow entry cancellation,
+  - `↩️ Назад` for step-back navigation.
+- Added a dedicated `↩️ Назад` button inside the medications window.
+- Added summary-mode memory for health navigation:
+  - when leaving summary to medications and then returning, the bot now goes back to the previously selected `День` or `Неделя` tab.
+- Preserved separate medication calendar behavior:
+  - back from medication calendar returns to the medications window,
+  - back from the medications window returns to the previous summary tab.
+- Validation after cleanup:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Tasks Button Order Cleanup
+
+- Moved the `➕ Задача` button to the bottom of the tasks inline keyboard.
+- The tasks screen now shows existing tasks first and keeps creation as the last action in the list.
+- Validation after cleanup:
+  - `python -m compileall bot backend alembic tests` passed.
+
+## 2026-03-06 Home Screen Refresh
+
+- Reworked the main dashboard text into clearer vertical blocks:
+  - header,
+  - today summary,
+  - progress bars,
+  - focus of the day,
+  - world/context block,
+  - companion hint,
+  - quick actions marker.
+- Added a compact focus list for up to 3 open tasks with priority markers.
+- Moved water progress on the home screen from `steps/5` to a percent label based on the user's configured daily target.
+- Kept the existing main actions unchanged, but made the home text easier to scan top-to-bottom.
+- Validation after refresh:
+  - `python -m compileall bot/handlers/single_message_parts/core_parts bot/handlers/single_message_parts/core.py` passed.
+
+## 2026-03-06 Health Undo Button Simplification
+
+- Simplified health-tab cancel/back/undo buttons to icon-only `↩️` labels.
+- Applied only inside the `Здоровье` inline keyboards, without changing the underlying actions.
+- Validation after cleanup:
+  - `python -m compileall bot/handlers/single_message_parts/health_parts bot/handlers/single_message_parts/health.py` passed.
+
+## 2026-03-06 Home Quick Actions Label Removal
+
+- Removed the `Быстрые действия` text label from the main screen.
+- The main dashboard now goes directly from the companion block to the inline action buttons.
+- Validation after cleanup:
+  - `python -m compileall bot/handlers/single_message_parts/core_parts bot/handlers/single_message_parts/core.py` passed.
+
+## 2026-03-06 Separate Water Tab
+
+- Added a dedicated `Вода` dashboard view and chat navigation button `💧 Вода`.
+- Moved focused hydration actions into the separate water screen:
+  - quick add buttons `150 / 250 / 500 мл`,
+  - undo last entry,
+  - exact amount entry in ml.
+- Added a new FSM state `waiting_water_amount_text` for exact water input.
+- Wired dashboard rendering so the water screen has its own text/keyboard and exact-input mode.
+- Removed water action buttons from the health summary keyboard to keep `Здоровье` focused on sleep, workouts, and medications.
+- Fixed water callback routing so the same `water:*` callbacks now preserve the current screen:
+  - from `Главная` they return to `Главная`,
+  - from `Вода` they stay in `Вода`,
+  - from `Здоровье` they still return to the health summary mode.
+- Removed duplicate `/water` command registration from the standalone water module and kept command navigation centralized in `core`.
+- Validation after adding the separate water tab:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-06 Persistent Single-Message Dashboard
+
+- Fixed the main reason dashboard messages accumulated in chat: the bot previously kept the active dashboard message id only in process memory.
+- Added persistent dashboard message references on the `users` table:
+  - `dashboard_chat_id`
+  - `dashboard_message_id`
+- Added migration `20260306_000009_add_dashboard_message_ref.py`.
+- Updated dashboard rendering flow so navigation now resolves the target message in this order:
+  - FSM state data,
+  - in-memory cache,
+  - persisted user record in the database.
+- When a dashboard message is created or edited successfully, the bot now stores the message reference back into state and the database.
+- `_reset_context(...)` now preserves the dashboard message reference across view/state resets.
+- This makes the single-message UI stable across normal navigation and bot restarts instead of spawning a new dashboard message each time the in-memory pointer is lost.
+- Telegram limitation still remains for the persistent chat keyboard carrier message: the reply keyboard still requires its own service message in chat.
+- Validation after persistence fix:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed,
+  - `.\\.venv\\Scripts\\python.exe -m alembic upgrade head` applied `20260306_000009`.
+
+## 2026-03-06 Water Navigation Adjustment
+
+- Removed `💧 Вода` from the persistent chat keyboard so hydration is no longer a top-level chat section.
+- Added a dedicated `💧 Вода` entry back into the health screen action area next to medications.
+- Added explicit `⬅️ Назад` navigation inside the water screen.
+- Fixed the ambiguity in the water screen controls:
+  - `↩️ Отмена` now clearly stays as water undo,
+  - `⬅️ Назад` now returns to the originating screen, which is `Здоровье` for the health entry flow.
+- Preserved exact ml entry flow and kept `↩️ Назад` from custom water input returning to the main water screen.
+- Validation after the navigation adjustment:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed.
+
+## 2026-03-07 Dashboard Duplicate Message Fix
+
+- Root cause of repeated dashboard messages was narrowed down to `_upsert_dashboard_message(...)`.
+- Before the fix, if Telegram returned `message is not modified` on `edit_message_text`, the bot treated it like a generic edit failure and sent a brand-new dashboard message with `answer(...)`.
+- Added `_is_message_not_modified(...)` helper and aligned message-path behavior with callback-path behavior.
+- `_upsert_dashboard_message(...)` now treats `message is not modified` as a no-op and keeps the existing dashboard reference instead of creating a duplicate dashboard message.
+- Added regression test `tests/test_dashboard_rendering.py` to verify that `message is not modified` does not trigger a new dashboard message.
+- Validation after the fix:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 20 tests.
+
+## 2026-03-07 Chat Menu Navigation Hardening
+
+- Refactored reply-keyboard chat navigation to use the same shared `_render_command_view(...)` path as slash commands.
+- Before the change, chat-menu navigation used its own duplicated flow in `msg_chat_navigation(...)`.
+- Now chat buttons and slash commands go through one rendering path, which reduces divergence and makes menu behavior deterministic.
+- Added support in `_render_command_view(...)` for `delete_source_message=True`, so chat-button messages can still be removed without duplicating navigation logic.
+- Added regression test `test_chat_navigation_uses_shared_render_command_view` to verify that pressing a chat-menu button dispatches through the shared command-view renderer.
+- Validation after the navigation hardening:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 21 tests.
+
+## 2026-03-07 Chat Menu Dashboard Relocation
+
+- Diagnosed the remaining UX issue with reply-keyboard chat buttons: the handlers were working, but they could edit an old dashboard message far above in chat, while the user only saw the persistent `Меню` carrier message near the bottom.
+- Added `_relocate_dashboard_message(...)` and `_clear_dashboard_ref(...)` to explicitly drop the old dashboard pointer and remove the previous dashboard message before rendering a fresh one near the current interaction point.
+- Extended `_render_command_view(...)` with:
+  - `force_keyboard`
+  - `relocate_dashboard`
+  - preserved `delete_source_message`
+- Reply-keyboard navigation now uses:
+  - `force_keyboard=False`
+  - `relocate_dashboard=True`
+  - `delete_source_message=True`
+- This keeps the persistent chat keyboard intact, removes the stale off-screen dashboard, and renders the active dashboard near the latest interaction so the user can actually see the opened section.
+- Updated the navigation regression test to cover the new relocation behavior.
+- Validation after the relocation fix:
+  - `python -m compileall bot backend alembic tests` passed,
+  - `.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v` passed with 21 tests.

@@ -46,6 +46,7 @@ from backend.services.task_service import (
 from backend.services.user_service import (
     get_or_create_user,
     get_user_by_telegram_id,
+    set_user_dashboard_message_ref,
     set_user_daily_water_target,
     set_user_daily_workout_target,
     set_user_preferred_name,
@@ -54,6 +55,7 @@ from backend.services.user_service import (
 __all__ = [
     "get_user_by_telegram_id",
     "get_or_create_user",
+    "set_user_dashboard_message_ref",
     "set_user_preferred_name",
     "set_user_daily_water_target",
     "set_user_daily_workout_target",

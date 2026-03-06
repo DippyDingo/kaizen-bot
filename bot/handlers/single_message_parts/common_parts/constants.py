@@ -21,6 +21,7 @@ VIEW_TASKS = "tasks"
 VIEW_CALENDAR = "calendar"
 VIEW_STATS = "stats"
 VIEW_HEALTH = "health"
+VIEW_WATER = "water"
 VIEW_DIARY = "diary"
 VIEW_PROFILE = "profile"
 VIEW_SETTINGS = "settings"
@@ -31,6 +32,7 @@ CHAT_BUTTON_DIARY = "📝 Дневник"
 CHAT_BUTTON_CALENDAR = "📅 Календарь"
 CHAT_BUTTON_STATS = "📊 Статистика"
 CHAT_BUTTON_HEALTH = "❤️ Здоровье"
+CHAT_BUTTON_WATER = "💧 Вода"
 CHAT_BUTTON_SETTINGS = "⚙️ Настройки"
 
 CHAT_NAVIGATION: dict[str, str] = {
@@ -40,6 +42,7 @@ CHAT_NAVIGATION: dict[str, str] = {
     CHAT_BUTTON_CALENDAR: VIEW_CALENDAR,
     CHAT_BUTTON_STATS: VIEW_STATS,
     CHAT_BUTTON_HEALTH: VIEW_HEALTH,
+    CHAT_BUTTON_WATER: VIEW_WATER,
     CHAT_BUTTON_SETTINGS: VIEW_SETTINGS,
 }
 
