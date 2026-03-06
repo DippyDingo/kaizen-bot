@@ -8,16 +8,20 @@ from backend.services.diary_service import (
     list_day_diary_entries,
 )
 from backend.services.health_service import (
+    add_workout_log,
     add_sleep_log,
     add_water_log,
+    get_day_workout_total_minutes,
     get_day_sleep_total_minutes,
     get_sleep_details_for_period,
     get_sleep_totals_for_period,
     get_sleep_total_minutes_all_time,
     get_today_water_total,
     get_water_details_for_period,
+    get_workout_details_for_period,
     get_water_total_for_period,
     get_water_total_all_time,
+    remove_last_workout_log,
     remove_last_sleep_log,
 )
 from backend.services.rpg_service import EXP_TABLE, add_exp, calculate_next_level_exp, remove_exp
@@ -30,12 +34,20 @@ from backend.services.task_service import (
     list_tasks_for_date,
     toggle_task_done,
 )
-from backend.services.user_service import get_or_create_user, get_user_by_telegram_id, set_user_preferred_name
+from backend.services.user_service import (
+    get_or_create_user,
+    get_user_by_telegram_id,
+    set_user_daily_water_target,
+    set_user_daily_workout_target,
+    set_user_preferred_name,
+)
 
 __all__ = [
     "get_user_by_telegram_id",
     "get_or_create_user",
     "set_user_preferred_name",
+    "set_user_daily_water_target",
+    "set_user_daily_workout_target",
     "EXP_TABLE",
     "add_exp",
     "remove_exp",
@@ -57,12 +69,16 @@ __all__ = [
     "get_today_water_total",
     "get_water_total_for_period",
     "get_water_total_all_time",
+    "get_day_workout_total_minutes",
     "get_day_sleep_total_minutes",
     "get_sleep_details_for_period",
     "get_sleep_totals_for_period",
     "get_sleep_total_minutes_all_time",
     "add_sleep_log",
     "remove_last_sleep_log",
+    "add_workout_log",
+    "remove_last_workout_log",
+    "get_workout_details_for_period",
     "get_task_details_for_period",
     "get_task_totals_for_period",
 ]

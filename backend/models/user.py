@@ -16,6 +16,8 @@ class User(Base):
     preferred_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="Europe/Moscow", nullable=False)
+    daily_water_target_ml: Mapped[int] = mapped_column(Integer, default=2500, nullable=False)
+    daily_workout_target_min: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
 
     level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     exp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

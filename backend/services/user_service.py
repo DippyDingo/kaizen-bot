@@ -45,3 +45,17 @@ async def set_user_preferred_name(session: AsyncSession, user: User, preferred_n
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def set_user_daily_water_target(session: AsyncSession, user: User, daily_water_target_ml: int) -> User:
+    user.daily_water_target_ml = max(250, daily_water_target_ml)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def set_user_daily_workout_target(session: AsyncSession, user: User, daily_workout_target_min: int) -> User:
+    user.daily_workout_target_min = max(5, daily_workout_target_min)
+    await session.commit()
+    await session.refresh(user)
+    return user

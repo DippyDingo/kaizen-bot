@@ -11,7 +11,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from backend.database import async_session
-from backend.services.user_service import get_or_create_user, set_user_preferred_name
+from backend.services.user_service import (
+    get_or_create_user,
+    set_user_daily_water_target,
+    set_user_daily_workout_target,
+    set_user_preferred_name,
+)
 from bot.states import DashboardStates
 
 from .common import (
@@ -51,7 +56,6 @@ STATS_PERIOD_LABELS = {
     "all": "Всё время",
 }
 
-STATS_WATER_TARGET_ML_PER_DAY = 2500
 STATS_SLEEP_TARGET_MIN_PER_DAY = 480
 
 
@@ -107,16 +111,23 @@ def _build_settings_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👤 Профиль", callback_data="view:profile")],
+            [InlineKeyboardButton(text="💧 Лимит воды", callback_data="settings:water_target")],
+            [InlineKeyboardButton(text="🏃 Лимит тренировок", callback_data="settings:workout_target")],
         ]
     )
 
 
-def _build_settings_text(user, notice: str | None) -> str:
+def _build_settings_text(user, notice: str | None, *, mode: str = "main") -> str:
     lines = [
         "<b>⚙️ НАСТРОЙКИ</b>",
         f"Текущее имя: <b>{html.escape(_display_name(user))}</b>",
-        "Здесь будут настройки профиля и будущие системные параметры.",
+        f"Лимит воды в день: <b>{user.daily_water_target_ml} мл</b>",
+        f"Лимит тренировок в день: <b>{user.daily_workout_target_min} мин</b>",
     ]
+    if mode == "wait_water":
+        lines.extend(["", "Отправь новый лимит воды в мл. Пример: <b>2200</b>."])
+    elif mode == "wait_workout":
+        lines.extend(["", "Отправь новый лимит тренировок в минутах. Пример: <b>40</b>."])
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])
     return "\n".join(lines)
@@ -164,7 +175,7 @@ def _build_home_text(
     hp_percent = _clamp_percent((done_count / total_tasks) * 100 if total_tasks else 0)
     hp_bar = _build_metric_bar("tasks", hp_percent)
 
-    mana_bar, mana_steps = _build_mana_bar(water_ml)
+    mana_bar, mana_steps = _build_mana_bar(water_ml, user.daily_water_target_ml)
 
     stamina_percent = _clamp_percent((sleep_minutes / 480) * 100)
     stamina_bar = _build_metric_bar("sleep", stamina_percent)
@@ -213,10 +224,13 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
     task_details = stats["task_details"]
     water_details = stats["water_details"]
     sleep_details = stats["sleep_details"]
+    workout_details = stats["workout_details"]
     diary_details = stats["diary_details"]
     task_bar = _build_metric_bar("tasks", completion_percent)
-    water_bar, water_percent = _build_goal_bar(avg_water_ml, STATS_WATER_TARGET_ML_PER_DAY, "water")
+    water_bar, water_percent = _build_goal_bar(avg_water_ml, user.daily_water_target_ml, "water")
     sleep_bar, sleep_percent = _build_goal_bar(avg_sleep_minutes, STATS_SLEEP_TARGET_MIN_PER_DAY, "sleep")
+    avg_workout_minutes = int(round(int(workout_details["total_minutes"]) / period_days)) if period_days else 0
+    workout_bar, workout_percent = _build_goal_bar(avg_workout_minutes, user.daily_workout_target_min, "workout")
     diary_active_percent = _clamp_percent((int(diary_details["active_days"]) / period_days) * 100 if period_days else 0)
     diary_bar = _build_metric_bar("diary", diary_active_percent)
     sleep_quality_percent = _clamp_percent((avg_sleep_quality / 5) * 100 if avg_sleep_quality else 0)
@@ -271,6 +285,21 @@ def _build_stats_text(user, stats: dict[str, int | float | str], selected_date: 
         f"• Активных дней: <b>{sleep_details['active_days']}</b>",
         f"• Лучший день: <b>{_sleep_duration_text(int(sleep_details['best_day_minutes']))}</b>",
         f"• Самый длинный сон: <b>{_sleep_duration_text(int(sleep_details['longest_log_minutes']))}</b>",
+        "",
+        "<b>Тренировки</b>",
+        f"• Всего: <b>{_sleep_duration_text(int(workout_details['total_minutes']))}</b>",
+        f"• Среднее: <b>{_sleep_duration_text(avg_workout_minutes)}/д</b>",
+        f"• {_build_bar_caption('Цель тренировок', workout_bar, f'{workout_percent}%')}",
+        (
+            f"• По типам: <b>💪 {workout_details['strength_count']}</b> | "
+            f"<b>🏃 {workout_details['cardio_count']}</b> | <b>🧘 {workout_details['mobility_count']}</b>"
+        ),
+        (
+            f"• Минуты по типам: <b>💪 {workout_details['strength_minutes']}</b> | "
+            f"<b>🏃 {workout_details['cardio_minutes']}</b> | <b>🧘 {workout_details['mobility_minutes']}</b>"
+        ),
+        f"• Активных дней: <b>{workout_details['active_days']}</b>",
+        f"• Лучший день: <b>{_sleep_duration_text(int(workout_details['best_day_minutes']))}</b>",
         "",
         "<b>Дневник</b>",
         f"• Записей: <b>{diary_total}</b>",
@@ -336,12 +365,19 @@ def _resolve_cancel_view(raw_state: str | None) -> str:
         return VIEW_PROFILE
     if raw_state == DashboardStates.waiting_sleep_exact_time.state:
         return VIEW_HEALTH
+    if raw_state == DashboardStates.waiting_workout_duration_text.state:
+        return VIEW_HEALTH
     if raw_state in {
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_task_priority.state,
         DashboardStates.waiting_task_date.state,
     }:
         return VIEW_TASKS
+    if raw_state in {
+        DashboardStates.waiting_daily_water_target.state,
+        DashboardStates.waiting_daily_workout_target.state,
+    }:
+        return VIEW_SETTINGS
     if raw_state == DashboardStates.waiting_diary_text.state:
         return VIEW_DIARY
     return VIEW_HOME
@@ -413,6 +449,80 @@ async def msg_display_name(message: Message, state: FSMContext) -> None:
     )
 
 
+@router.message(StateFilter(DashboardStates.waiting_daily_water_target))
+async def msg_daily_water_target(message: Message, state: FSMContext) -> None:
+    raw_text = (message.text or "").strip()
+    if not raw_text.isdigit():
+        await _render(
+            from_user=message.from_user,
+            state=state,
+            message=message,
+            notice="Нужны только цифры. Пример: 2200",
+        )
+        return
+
+    target_ml = int(raw_text)
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+        await set_user_daily_water_target(session, user, target_ml)
+
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+    await _reset_context(state, view_mode=VIEW_SETTINGS)
+    await _render(
+        from_user=message.from_user,
+        state=state,
+        message=message,
+        notice=f"Лимит воды обновлен: {max(250, target_ml)} мл",
+    )
+
+
+@router.message(StateFilter(DashboardStates.waiting_daily_workout_target))
+async def msg_daily_workout_target(message: Message, state: FSMContext) -> None:
+    raw_text = (message.text or "").strip()
+    if not raw_text.isdigit():
+        await _render(
+            from_user=message.from_user,
+            state=state,
+            message=message,
+            notice="Нужны только цифры. Пример: 40",
+        )
+        return
+
+    target_min = int(raw_text)
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+        await set_user_daily_workout_target(session, user, target_min)
+
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+    await _reset_context(state, view_mode=VIEW_SETTINGS)
+    await _render(
+        from_user=message.from_user,
+        state=state,
+        message=message,
+        notice=f"Лимит тренировок обновлен: {max(5, target_min)} мин",
+    )
+
+
 @router.callback_query(F.data == "view:profile")
 async def cb_view_profile(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
@@ -428,6 +538,22 @@ async def cb_view_settings(callback: CallbackQuery, state: FSMContext) -> None:
     await _reset_context(state, view_mode=VIEW_SETTINGS)
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()
+
+
+@router.callback_query(F.data == "settings:water_target")
+async def cb_settings_water_target(callback: CallbackQuery, state: FSMContext) -> None:
+    await _reset_context(state, view_mode=VIEW_SETTINGS)
+    await state.set_state(DashboardStates.waiting_daily_water_target)
+    await _render(from_user=callback.from_user, state=state, callback=callback, notice="Жду новый лимит воды.")
+    await callback.answer("Жду число")
+
+
+@router.callback_query(F.data == "settings:workout_target")
+async def cb_settings_workout_target(callback: CallbackQuery, state: FSMContext) -> None:
+    await _reset_context(state, view_mode=VIEW_SETTINGS)
+    await state.set_state(DashboardStates.waiting_daily_workout_target)
+    await _render(from_user=callback.from_user, state=state, callback=callback, notice="Жду новый лимит тренировок.")
+    await callback.answer("Жду число")
 
 
 @router.callback_query(F.data == "profile:edit")
@@ -578,6 +704,9 @@ async def fallback(message: Message, state: FSMContext) -> None:
     if await state.get_state() not in {
         DashboardStates.waiting_display_name.state,
         DashboardStates.waiting_sleep_exact_time.state,
+        DashboardStates.waiting_workout_duration_text.state,
+        DashboardStates.waiting_daily_water_target.state,
+        DashboardStates.waiting_daily_workout_target.state,
         DashboardStates.waiting_task_title.state,
         DashboardStates.waiting_diary_text.state,
     }:
@@ -590,5 +719,5 @@ async def fallback(message: Message, state: FSMContext) -> None:
         from_user=message.from_user,
         state=state,
         message=message,
-        notice="Управление кнопками. Текст нужен только для названия задачи, имени или точного времени сна.",
+        notice="Управление кнопками. Текст нужен только для имени, названия задачи, записи дневника, точного времени сна, своей длительности тренировки и лимитов в настройках.",
     )

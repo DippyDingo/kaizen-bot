@@ -32,12 +32,14 @@ from backend.services.diary_service import (
     list_day_diary_entries,
 )
 from backend.services.health_service import (
+    get_day_workout_total_minutes,
     get_day_sleep_total_minutes,
     get_sleep_details_for_period,
     get_sleep_totals_for_period,
     get_sleep_total_minutes_all_time,
     get_today_water_total,
     get_water_details_for_period,
+    get_workout_details_for_period,
     get_water_total_for_period,
     get_water_total_all_time,
 )
@@ -149,6 +151,7 @@ BAR_FILLED: dict[str, str] = {
     "tasks": "🟩",
     "water": "🟦",
     "sleep": "🟨",
+    "workout": "🟧",
     "diary": "🟪",
     "quality": "🟫",
 }
@@ -229,9 +232,9 @@ def _build_step_bar(filled_steps: int, metric: str, total: int = BAR_STEPS) -> s
     return (filled * safe_steps) + (BAR_EMPTY * (total - safe_steps))
 
 
-def _build_mana_bar(water_ml: int) -> tuple[str, int]:
+def _build_mana_bar(water_ml: int, target_ml: int = 2500) -> tuple[str, int]:
     max_steps = BAR_STEPS
-    step_ml = 500
+    step_ml = max(1, int(round(target_ml / max_steps)))
     mana_steps = max(0, min(max_steps, int(round(water_ml / step_ml))))
     bar = _build_step_bar(mana_steps, "water", total=max_steps)
     return bar, mana_steps
@@ -252,14 +255,17 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
     async with async_session() as session:
         day_water_total = await get_today_water_total(session, user_id, selected_date)
         day_sleep_total = await get_day_sleep_total_minutes(session, user_id, selected_date)
+        day_workout_total = await get_day_workout_total_minutes(session, user_id, selected_date)
         day_sleep_details = await get_sleep_details_for_period(session, user_id, selected_date, selected_date)
         week_water_details = await get_water_details_for_period(session, user_id, week_from, selected_date)
         week_sleep_details = await get_sleep_details_for_period(session, user_id, week_from, selected_date)
+        week_workout_details = await get_workout_details_for_period(session, user_id, week_from, selected_date)
 
     return {
         "week_from": week_from,
         "day_water_total": day_water_total,
         "day_sleep_total": day_sleep_total,
+        "day_workout_total": day_workout_total,
         "day_avg_quality": float(day_sleep_details["avg_quality"]),
         "week_water_total": int(week_water_details["total_ml"]),
         "week_water_active_days": int(week_water_details["active_days"]),
@@ -270,6 +276,17 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "week_best_sleep_day": int(week_sleep_details["best_day_minutes"]),
         "week_sleep_avg": int(round(int(week_sleep_details["total_minutes"]) / 7)),
         "week_avg_quality": float(week_sleep_details["avg_quality"]),
+        "week_workout_total": int(week_workout_details["total_minutes"]),
+        "week_workout_sessions": int(week_workout_details["sessions_count"]),
+        "week_workout_active_days": int(week_workout_details["active_days"]),
+        "week_best_workout_day": int(week_workout_details["best_day_minutes"]),
+        "week_workout_avg": int(round(int(week_workout_details["total_minutes"]) / 7)),
+        "week_strength_count": int(week_workout_details["strength_count"]),
+        "week_cardio_count": int(week_workout_details["cardio_count"]),
+        "week_mobility_count": int(week_workout_details["mobility_count"]),
+        "week_strength_minutes": int(week_workout_details["strength_minutes"]),
+        "week_cardio_minutes": int(week_workout_details["cardio_minutes"]),
+        "week_mobility_minutes": int(week_workout_details["mobility_minutes"]),
     }
 
 
@@ -523,6 +540,7 @@ async def _load_user_period_stats(from_user, selected_date: date, period: str) -
         task_details = await get_task_details_for_period(session, user.id, detail_from, detail_to)
         water_details = await get_water_details_for_period(session, user.id, detail_from, detail_to)
         sleep_details = await get_sleep_details_for_period(session, user.id, detail_from, detail_to)
+        workout_details = await get_workout_details_for_period(session, user.id, detail_from, detail_to)
         diary_details = await get_diary_details_for_period(session, user.id, detail_from, detail_to)
 
     return user, {
@@ -537,6 +555,7 @@ async def _load_user_period_stats(from_user, selected_date: date, period: str) -
         "task_details": task_details,
         "water_details": water_details,
         "sleep_details": sleep_details,
+        "workout_details": workout_details,
         "diary_details": diary_details,
     }
 
@@ -662,6 +681,12 @@ async def _render(
     elif current_state == DashboardStates.waiting_display_name.state:
         text = _build_profile_text(user, mode="wait_name", notice=notice)
         keyboard = _build_profile_keyboard(editing=True)
+    elif current_state == DashboardStates.waiting_daily_water_target.state:
+        text = _build_settings_text(user, notice=notice, mode="wait_water")
+        keyboard = _build_settings_keyboard()
+    elif current_state == DashboardStates.waiting_daily_workout_target.state:
+        text = _build_settings_text(user, notice=notice, mode="wait_workout")
+        keyboard = _build_settings_keyboard()
     elif current_state == DashboardStates.waiting_task_priority.state:
         text = _build_tasks_text(tasks, selected_date, "wait_priority", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_priority_keyboard()
@@ -693,6 +718,9 @@ async def _render(
         pending_sleep_minutes_raw = data.get("pending_sleep_minutes")
         pending_sleep_minutes = int(pending_sleep_minutes_raw) if pending_sleep_minutes_raw else None
         health_summary = await _load_health_summary(user.id, selected_date)
+        health_summary["pending_workout_type"] = data.get("pending_workout_type")
+        health_summary["daily_water_target_ml"] = user.daily_water_target_ml
+        health_summary["daily_workout_target_min"] = user.daily_workout_target_min
         text = _build_health_text(
             water_ml,
             sleep_minutes,

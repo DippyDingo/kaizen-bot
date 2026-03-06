@@ -403,3 +403,62 @@
 - Kept the existing inline text flow and the shared bar caption helper.
 - Updated file:
   - `bot/handlers/single_message_parts/core.py`
+## 2026-03-06 Workout Logs And Health UI
+
+- Added a new `WorkoutLog` model and migration `20260306_000005_add_workout_logs`.
+- Added health-service operations for workouts:
+  - create workout log,
+  - undo last workout log for a selected day,
+  - day total minutes,
+  - period details for summaries.
+- Expanded the `Çהמנמגüו` UI with a workout flow:
+  - choose workout type,
+  - choose duration,
+  - save workout,
+  - undo last workout.
+- Added workout summaries to both health screens:
+  - day summary,
+  - week summary.
+- Current MVP assumptions for workouts:
+  - supported types: strength, cardio, mobility,
+  - supported durations: 15 / 30 / 45 / 60 minutes,
+  - workout log grants `+30 EXP` to match the current project plan.
+- Synced `README.md` with the actual state of the repository, including health, statistics and the new workout block.
+- Updated files:
+  - `backend/models/workout_log.py`
+  - `backend/models/__init__.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `backend/services/rpg_service.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `alembic/versions/20260306_000005_add_workout_logs.py`
+  - `README.md`
+## 2026-03-06 Workout Limits And Custom Duration
+
+- Added per-user daily targets:
+  - `daily_water_target_ml`
+  - `daily_workout_target_min`
+- Added migration `20260306_000006_add_user_daily_targets`.
+- Settings now allow changing:
+  - daily water limit,
+  - daily workout limit.
+- Main dashboard, health summaries and statistics now use the user's own water target instead of a hardcoded default.
+- Workout logging was extended with free duration input:
+  - plain minutes, example `25`
+  - hours and minutes, example `1:15`
+- Workout statistics were expanded with per-type aggregates:
+  - strength / cardio / mobility counts,
+  - strength / cardio / mobility minutes.
+- Weekly health summary now shows workout distribution by type.
+- Updated files:
+  - `backend/models/user.py`
+  - `backend/services/user_service.py`
+  - `backend/services/health_service.py`
+  - `backend/services/__init__.py`
+  - `bot/states/states.py`
+  - `bot/handlers/single_message_parts/common.py`
+  - `bot/handlers/single_message_parts/core.py`
+  - `bot/handlers/single_message_parts/health.py`
+  - `alembic/versions/20260306_000006_add_user_daily_targets.py`
+  - `README.md`

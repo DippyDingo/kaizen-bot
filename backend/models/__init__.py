@@ -4,6 +4,7 @@ from backend.models.sleep_log import SleepLog
 from backend.models.task import Task
 from backend.models.user import User
 from backend.models.water_log import WaterLog
+from backend.models.workout_log import WorkoutLog
 
 __all__ = [
     "DiaryEntry",
@@ -12,4 +13,5 @@ __all__ = [
     "WaterLog",
     "SleepLog",
     "Habit",
+    "WorkoutLog",
 ]
