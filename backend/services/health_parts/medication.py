@@ -35,7 +35,7 @@ def _build_medication_schedule_items(
                 "start_date": course.start_date,
                 "end_date": course.end_date,
                 "days_left": max((course.end_date - target_day).days + 1, 0),
-                "status": log.status if log else "pending",
+                "status": "taken" if log and log.status == "taken" else "skipped",
             }
         )
     return items
@@ -72,15 +72,35 @@ def _build_medication_calendar_marks(
         skipped = values["skipped"]
         if taken == scheduled and scheduled > 0:
             marks[day_key] = "done"
-        elif skipped > 0 and taken + skipped >= scheduled:
-            marks[day_key] = "skipped"
         else:
-            marks[day_key] = "planned"
+            marks[day_key] = "skipped"
     return marks
 
 
-def _build_medication_details(logs: list[MedicationLog]) -> dict[str, int | str]:
-    if not logs:
+def _build_medication_details(
+    courses: list[MedicationCourse],
+    logs: list[MedicationLog],
+    date_from: date,
+    date_to: date,
+) -> dict[str, int | str]:
+    scheduled_by_day: dict[date, int] = {}
+    scheduled_by_title: dict[str, int] = {}
+    unique_titles: set[str] = set()
+
+    for course in courses:
+        overlap_start = max(course.start_date, date_from)
+        overlap_end = min(course.end_date, date_to)
+        if overlap_start > overlap_end:
+            continue
+        day = overlap_start
+        while day <= overlap_end:
+            scheduled_by_day[day] = scheduled_by_day.get(day, 0) + 1
+            scheduled_by_title[course.title] = scheduled_by_title.get(course.title, 0) + 1
+            unique_titles.add(course.title)
+            day += timedelta(days=1)
+
+    total_scheduled = sum(scheduled_by_day.values())
+    if total_scheduled == 0 and not logs:
         return {
             "total_logs": 0,
             "active_days": 0,
@@ -91,31 +111,23 @@ def _build_medication_details(logs: list[MedicationLog]) -> dict[str, int | str]
             "skipped_count": 0,
         }
 
-    by_day: dict[date, int] = {}
-    by_title: dict[str, int] = {}
-    titles: set[str] = set()
     taken_count = 0
-    skipped_count = 0
 
     for log in logs:
-        scheduled_date = log.scheduled_date or log.logged_at.date()
-        by_day[scheduled_date] = by_day.get(scheduled_date, 0) + 1
-        by_title[log.title] = by_title.get(log.title, 0) + 1
-        titles.add(log.title)
         if log.status == "taken":
             taken_count += 1
-        elif log.status == "skipped":
-            skipped_count += 1
 
     top_title = ""
-    if by_title:
-        top_title = sorted(by_title.items(), key=lambda item: (-item[1], item[0].lower()))[0][0]
+    if scheduled_by_title:
+        top_title = sorted(scheduled_by_title.items(), key=lambda item: (-item[1], item[0].lower()))[0][0]
+
+    skipped_count = max(total_scheduled - taken_count, 0)
 
     return {
-        "total_logs": len(logs),
-        "active_days": len(by_day),
-        "unique_titles": len(titles),
-        "best_day_logs": max(by_day.values()) if by_day else 0,
+        "total_logs": total_scheduled,
+        "active_days": len(scheduled_by_day),
+        "unique_titles": len(unique_titles),
+        "best_day_logs": max(scheduled_by_day.values()) if scheduled_by_day else 0,
         "top_title": top_title,
         "taken_count": taken_count,
         "skipped_count": skipped_count,
@@ -226,7 +238,7 @@ async def toggle_medication_intake_status(
     target_day: date,
     status: str,
 ) -> tuple[str | None, MedicationCourse | None, int]:
-    if status not in {"taken", "skipped"}:
+    if status != "taken":
         return None, None, 0
 
     course_result = await session.execute(
@@ -257,22 +269,16 @@ async def toggle_medication_intake_status(
 
     if existing_log and existing_log.status == status:
         await session.delete(existing_log)
-        level_change = 0
-        if status == "taken":
-            level_change = -remove_exp(user, EXP_TABLE["medication_logged"])
+        level_change = -remove_exp(user, EXP_TABLE["medication_logged"])
         await session.commit()
         await session.refresh(user)
-        return "pending", course, level_change
+        return "skipped", course, level_change
 
     if existing_log:
         previous_status = existing_log.status
         existing_log.status = status
         existing_log.logged_at = datetime.utcnow()
-        level_change = 0
-        if previous_status != "taken" and status == "taken":
-            level_change = add_exp(user, EXP_TABLE["medication_logged"])
-        elif previous_status == "taken" and status != "taken":
-            level_change = -remove_exp(user, EXP_TABLE["medication_logged"])
+        level_change = add_exp(user, EXP_TABLE["medication_logged"]) if previous_status != "taken" else 0
         await session.commit()
         await session.refresh(user)
         return status, course, level_change
@@ -288,8 +294,7 @@ async def toggle_medication_intake_status(
     )
     session.add(medication_log)
     level_change = 0
-    if status == "taken":
-        level_change = add_exp(user, EXP_TABLE["medication_logged"])
+    level_change = add_exp(user, EXP_TABLE["medication_logged"])
     await session.commit()
     await session.refresh(user)
     return status, course, level_change
@@ -395,6 +400,17 @@ async def get_medication_details_for_period(
     date_from: date,
     date_to: date,
 ) -> dict[str, int | str]:
+    courses_result = await session.execute(
+        select(MedicationCourse).where(
+            and_(
+                MedicationCourse.user_id == user_id,
+                MedicationCourse.start_date <= date_to,
+                MedicationCourse.end_date >= date_from,
+            )
+        )
+    )
+    courses = list(courses_result.scalars())
+
     result = await session.execute(
         select(MedicationLog).where(
             and_(
@@ -405,4 +421,4 @@ async def get_medication_details_for_period(
         )
     )
     logs = list(result.scalars())
-    return _build_medication_details(logs)
+    return _build_medication_details(courses, logs, date_from, date_to)

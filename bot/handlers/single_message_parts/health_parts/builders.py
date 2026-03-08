@@ -110,7 +110,7 @@ def _medication_status_icon(status: str) -> str:
     return {
         "taken": "🟢",
         "skipped": "🔴",
-        "pending": "🟡",
+        "pending": "🔴",
     }.get(status, "🟡")
 
 
@@ -201,27 +201,15 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
                     InlineKeyboardButton(text="🗑", callback_data=f"med:delete:{course_id}"),
                 ]
             )
-            if status == "taken":
-                rows.append(
-                    [
-                        InlineKeyboardButton(text="↩️", callback_data=f"med:toggle:{course_id}:taken"),
-                        InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped"),
-                    ]
-                )
-            elif status == "skipped":
-                rows.append(
-                    [
-                        InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"),
-                        InlineKeyboardButton(text="↩️", callback_data=f"med:toggle:{course_id}:skipped"),
-                    ]
-                )
-            else:
-                rows.append(
-                    [
-                        InlineKeyboardButton(text="✅ Выпил", callback_data=f"med:toggle:{course_id}:taken"),
-                        InlineKeyboardButton(text="✖️ Пропуск", callback_data=f"med:toggle:{course_id}:skipped"),
-                    ]
-                )
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="✅ Выпил",
+                        callback_data=f"med:toggle:{course_id}:taken",
+                        style="success" if status == "taken" else "danger",
+                    ),
+                ]
+            )
         rows.append([InlineKeyboardButton(text="↩️", callback_data="med:close")])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 

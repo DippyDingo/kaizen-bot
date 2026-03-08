@@ -10,12 +10,12 @@ from backend.services.health_service import (
 
 
 class MedicationServiceAggregateTests(unittest.TestCase):
-    def test_build_medication_schedule_items_sets_status_and_days_left(self) -> None:
+    def test_build_medication_schedule_items_defaults_unchecked_items_to_skipped(self) -> None:
         course_a = MedicationCourse(
             id=1,
             user_id=1,
-            title="Магний",
-            dose="1 таб",
+            title="Magnesium",
+            dose="1 tab",
             intake_time=time(8, 0),
             start_date=date(2026, 3, 6),
             end_date=date(2026, 3, 10),
@@ -25,7 +25,7 @@ class MedicationServiceAggregateTests(unittest.TestCase):
         course_b = MedicationCourse(
             id=2,
             user_id=1,
-            title="Витамин D",
+            title="Vitamin D",
             dose="2000 IU",
             intake_time=time(13, 0),
             start_date=date(2026, 3, 5),
@@ -37,8 +37,8 @@ class MedicationServiceAggregateTests(unittest.TestCase):
             id=1,
             user_id=1,
             course_id=1,
-            title="Магний",
-            dose="1 таб",
+            title="Magnesium",
+            dose="1 tab",
             scheduled_date=date(2026, 3, 6),
             status="taken",
             logged_at=datetime(2026, 3, 6, 8, 5),
@@ -51,14 +51,14 @@ class MedicationServiceAggregateTests(unittest.TestCase):
         self.assertEqual("08:00", items[0]["intake_time"])
         self.assertEqual("taken", items[0]["status"])
         self.assertEqual(5, items[0]["days_left"])
-        self.assertEqual("pending", items[1]["status"])
+        self.assertEqual("skipped", items[1]["status"])
 
-    def test_build_medication_calendar_marks_distinguishes_done_skipped_and_planned(self) -> None:
+    def test_build_medication_calendar_marks_treats_unchecked_days_as_skipped(self) -> None:
         course = MedicationCourse(
             id=1,
             user_id=1,
-            title="Магний",
-            dose="1 таб",
+            title="Magnesium",
+            dose="1 tab",
             intake_time=time(8, 0),
             start_date=date(2026, 3, 6),
             end_date=date(2026, 3, 8),
@@ -70,23 +70,12 @@ class MedicationServiceAggregateTests(unittest.TestCase):
                 id=1,
                 user_id=1,
                 course_id=1,
-                title="Магний",
-                dose="1 таб",
+                title="Magnesium",
+                dose="1 tab",
                 scheduled_date=date(2026, 3, 6),
                 status="taken",
                 logged_at=datetime(2026, 3, 6, 8, 5),
                 created_at=datetime(2026, 3, 6, 8, 5),
-            ),
-            MedicationLog(
-                id=2,
-                user_id=1,
-                course_id=1,
-                title="Магний",
-                dose="1 таб",
-                scheduled_date=date(2026, 3, 7),
-                status="skipped",
-                logged_at=datetime(2026, 3, 7, 8, 5),
-                created_at=datetime(2026, 3, 7, 8, 5),
             ),
         ]
 
@@ -94,16 +83,40 @@ class MedicationServiceAggregateTests(unittest.TestCase):
 
         self.assertEqual("done", marks[date(2026, 3, 6)])
         self.assertEqual("skipped", marks[date(2026, 3, 7)])
-        self.assertEqual("planned", marks[date(2026, 3, 8)])
+        self.assertEqual("skipped", marks[date(2026, 3, 8)])
 
-    def test_build_medication_details_counts_taken_skipped_unique_and_top_title(self) -> None:
+    def test_build_medication_details_counts_taken_and_default_skips(self) -> None:
+        courses = [
+            MedicationCourse(
+                id=1,
+                user_id=1,
+                title="Magnesium",
+                dose="1 tab",
+                intake_time=time(8, 0),
+                start_date=date(2026, 3, 6),
+                end_date=date(2026, 3, 7),
+                is_active=True,
+                created_at=datetime(2026, 3, 6, 7, 0),
+            ),
+            MedicationCourse(
+                id=2,
+                user_id=1,
+                title="Vitamin D",
+                dose="2000 IU",
+                intake_time=time(13, 0),
+                start_date=date(2026, 3, 7),
+                end_date=date(2026, 3, 7),
+                is_active=True,
+                created_at=datetime(2026, 3, 7, 7, 0),
+            ),
+        ]
         logs = [
             MedicationLog(
                 id=1,
                 user_id=1,
                 course_id=1,
-                title="Магний",
-                dose="1 таб",
+                title="Magnesium",
+                dose="1 tab",
                 scheduled_date=date(2026, 3, 6),
                 status="taken",
                 logged_at=datetime(2026, 3, 6, 8, 5),
@@ -112,19 +125,8 @@ class MedicationServiceAggregateTests(unittest.TestCase):
             MedicationLog(
                 id=2,
                 user_id=1,
-                course_id=1,
-                title="Магний",
-                dose="1 таб",
-                scheduled_date=date(2026, 3, 7),
-                status="skipped",
-                logged_at=datetime(2026, 3, 7, 8, 5),
-                created_at=datetime(2026, 3, 7, 8, 5),
-            ),
-            MedicationLog(
-                id=3,
-                user_id=1,
                 course_id=2,
-                title="Витамин D",
+                title="Vitamin D",
                 dose="2000 IU",
                 scheduled_date=date(2026, 3, 7),
                 status="taken",
@@ -133,7 +135,7 @@ class MedicationServiceAggregateTests(unittest.TestCase):
             ),
         ]
 
-        details = _build_medication_details(logs)
+        details = _build_medication_details(courses, logs, date(2026, 3, 6), date(2026, 3, 7))
 
         self.assertEqual(3, details["total_logs"])
         self.assertEqual(2, details["active_days"])
@@ -141,4 +143,4 @@ class MedicationServiceAggregateTests(unittest.TestCase):
         self.assertEqual(2, details["best_day_logs"])
         self.assertEqual(2, details["taken_count"])
         self.assertEqual(1, details["skipped_count"])
-        self.assertEqual("Магний", details["top_title"])
+        self.assertEqual("Magnesium", details["top_title"])

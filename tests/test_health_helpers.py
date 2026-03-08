@@ -38,6 +38,6 @@ class HealthHelpersTests(unittest.TestCase):
         self.assertIsNone(_parse_medication_days_input("0"))
 
     def test_medication_status_icon(self) -> None:
-        self.assertEqual("🟢", _medication_status_icon("taken"))
-        self.assertEqual("🔴", _medication_status_icon("skipped"))
-        self.assertEqual("🟡", _medication_status_icon("pending"))
+        self.assertEqual("\U0001f7e2", _medication_status_icon("taken"))
+        self.assertEqual("\U0001f534", _medication_status_icon("skipped"))
+        self.assertEqual("\U0001f534", _medication_status_icon("pending"))

@@ -287,12 +287,8 @@ async def cb_med_toggle(callback: CallbackQuery, state) -> None:
         notice = f"{_short_medication(course.title)} отмечено как выпито (+10 EXP)"
         if level_change > 0:
             notice += f" | Уровень +{level_change}"
-    elif result_status == "skipped":
-        notice = f"{_short_medication(course.title)} отмечено как пропуск"
-        if level_change < 0:
-            notice += f" | Уровень {level_change}"
     else:
-        notice = f"Статус {_short_medication(course.title)} сброшен"
+        notice = f"Отметка {_short_medication(course.title)} снята. Сейчас это считается пропуском"
         if level_change < 0:
             notice += f" | Уровень {level_change}"
 
