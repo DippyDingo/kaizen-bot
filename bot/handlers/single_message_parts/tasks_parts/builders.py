@@ -20,7 +20,7 @@ def _task_priority_badge(priority: str) -> str:
 
 def _build_tasks_keyboard(tasks: list, selected_date: date) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        _date_nav_row(selected_date),
+        _date_nav_row(selected_date, center_callback_data="task:calendar"),
     ]
 
     if not tasks:

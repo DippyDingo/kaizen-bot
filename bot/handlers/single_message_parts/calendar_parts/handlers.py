@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery
 
 from bot.states import DashboardStates
 
-from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, _month_start, _parse_iso_date, _render, router
+from ..common import VIEW_CALENDAR, VIEW_DIARY, VIEW_HEALTH, VIEW_TASKS, _month_start, _parse_iso_date, _render, router
 
 
 @router.callback_query(F.data.startswith("date:shift:"))
@@ -41,6 +41,8 @@ async def cb_cal_nav(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(view_mode=VIEW_CALENDAR, diary_calendar_mode=False)
     elif context == "diary":
         await state.update_data(view_mode=VIEW_DIARY, diary_calendar_mode=True)
+    elif context == "tasks":
+        await state.update_data(view_mode=VIEW_TASKS, task_calendar_mode=True)
     elif context == "med":
         from ..health import HEALTH_MODE_MEDICATION_CALENDAR
 
@@ -68,6 +70,17 @@ async def cb_cal_today(callback: CallbackQuery, state: FSMContext) -> None:
             calendar_month=_month_start(today).isoformat(),
             view_mode=VIEW_CALENDAR,
             diary_calendar_mode=False,
+        )
+        await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {today.strftime('%d.%m.%Y')}")
+        await callback.answer()
+        return
+
+    if context == "tasks":
+        await state.update_data(
+            selected_date=today.isoformat(),
+            calendar_month=_month_start(today).isoformat(),
+            view_mode=VIEW_TASKS,
+            task_calendar_mode=False,
         )
         await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {today.strftime('%d.%m.%Y')}")
         await callback.answer()
@@ -121,6 +134,17 @@ async def cb_cal_pick(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer()
         return
 
+    if context == "tasks":
+        await state.update_data(
+            selected_date=picked_date.isoformat(),
+            calendar_month=_month_start(picked_date).isoformat(),
+            view_mode=VIEW_TASKS,
+            task_calendar_mode=False,
+        )
+        await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {picked_date.strftime('%d.%m.%Y')}")
+        await callback.answer()
+        return
+
     if context == "diary":
         await state.update_data(selected_date=picked_date.isoformat(), view_mode=VIEW_DIARY, diary_calendar_mode=True)
         await _render(from_user=callback.from_user, state=state, callback=callback, notice=f"Выбрана дата {picked_date.strftime('%d.%m.%Y')}")
@@ -151,6 +175,13 @@ async def cb_cal_pick(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "cal:to_diary")
 async def cb_cal_to_diary(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(view_mode=VIEW_DIARY, diary_calendar_mode=False)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cal:to_tasks")
+async def cb_cal_to_tasks(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(view_mode=VIEW_TASKS, task_calendar_mode=False)
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()
 

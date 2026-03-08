@@ -71,6 +71,27 @@ async def cb_task_add(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer("Введи название")
 
 
+@router.callback_query(F.data == "task:calendar")
+async def cb_task_calendar(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    selected_date = _parse_iso_date(data.get("selected_date"), date.today())
+    await state.update_data(
+        view_mode=VIEW_TASKS,
+        selected_date=selected_date.isoformat(),
+        calendar_month=_month_start(selected_date).isoformat(),
+        task_calendar_mode=True,
+    )
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "task:calendar:close")
+async def cb_task_calendar_close(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(view_mode=VIEW_TASKS, task_calendar_mode=False)
+    await _render(from_user=callback.from_user, state=state, callback=callback)
+    await callback.answer()
+
+
 @router.callback_query(F.data == "task:cancel")
 async def cb_task_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()

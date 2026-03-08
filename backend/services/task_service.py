@@ -107,6 +107,47 @@ async def get_task_details_for_period(
     }
 
 
+async def get_task_calendar_marks(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> dict[date, dict[str, int | str]]:
+    result = await session.execute(
+        select(
+            Task.task_date,
+            func.count(Task.id),
+            func.coalesce(func.sum(case((Task.is_done.is_(True), 1), else_=0)), 0),
+        ).where(
+            and_(
+                Task.user_id == user_id,
+                Task.task_date >= date_from,
+                Task.task_date <= date_to,
+            )
+        )
+        .group_by(Task.task_date)
+    )
+
+    marks: dict[date, dict[str, int | str]] = {}
+    for task_date, total, done in result.all():
+        total_int = int(total or 0)
+        done_int = int(done or 0)
+        if total_int <= 0:
+            continue
+        if done_int == total_int:
+            status = "done"
+        elif done_int > 0:
+            status = "mixed"
+        else:
+            status = "open"
+        marks[task_date] = {
+            "total": total_int,
+            "done": done_int,
+            "status": status,
+        }
+    return marks
+
+
 async def toggle_task_done(
     session: AsyncSession,
     user: User,

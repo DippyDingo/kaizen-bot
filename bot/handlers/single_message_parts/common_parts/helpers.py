@@ -89,10 +89,10 @@ def _build_mana_bar(water_ml: int, target_ml: int = 2500) -> tuple[str, int]:
     return _build_step_bar(mana_steps, "water", total=BAR_STEPS), mana_steps
 
 
-def _date_nav_row(selected_date: date) -> list[InlineKeyboardButton]:
+def _date_nav_row(selected_date: date, *, center_callback_data: str = "cal:noop") -> list[InlineKeyboardButton]:
     return [
         InlineKeyboardButton(text="◀️", callback_data="date:shift:-1"),
-        InlineKeyboardButton(text=selected_date.strftime("%d.%m"), callback_data="cal:noop"),
+        InlineKeyboardButton(text=selected_date.strftime("%d.%m"), callback_data=center_callback_data),
         InlineKeyboardButton(text="▶️", callback_data="date:shift:1"),
     ]
 

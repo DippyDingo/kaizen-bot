@@ -41,6 +41,12 @@ def _build_calendar_keyboard(
             text = str(day_num)
             if day_date == selected_date:
                 text = f"🔘{day_num}"
+            elif context == "tasks" and marks.get(day_date) == "done":
+                text = f"✅{day_num}"
+            elif context == "tasks" and marks.get(day_date) == "mixed":
+                text = f"🟡{day_num}"
+            elif context == "tasks" and marks.get(day_date) == "open":
+                text = f"🔴{day_num}"
             elif context == "med" and marks.get(day_date) == "done":
                 text = f"✅{day_num}"
             elif context == "med" and marks.get(day_date) == "skipped":
@@ -78,6 +84,9 @@ def _build_calendar_keyboard(
                 InlineKeyboardButton(text="↩️ Назад", callback_data="task:cancel"),
             ]
         )
+    elif context == "tasks":
+        rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:tasks")])
+        rows.append([InlineKeyboardButton(text="↩️ Назад", callback_data="task:calendar:close")])
     elif context == "browse":
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:browse")])
     elif context == "diary":
@@ -108,6 +117,32 @@ def _build_diary_calendar_text(selected_date: date, notice: str | None) -> str:
         "<b>📅 КАЛЕНДАРЬ ДНЕВНИКА</b>",
         f"Выбранная дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
         "Выбери день и открой записи.",
+    ]
+    if notice:
+        lines.extend(["", f"ℹ️ {notice}"])
+    return "\n".join(lines)
+
+
+def _build_task_calendar_text(
+    selected_date: date,
+    day_summary: dict[str, int],
+    notice: str | None,
+) -> str:
+    total = int(day_summary.get("total", 0))
+    done = int(day_summary.get("done", 0))
+    open_count = max(total - done, 0)
+
+    if total <= 0:
+        summary_line = "На этот день задач нет"
+    else:
+        task_word = "задач" if total != 1 else "задача"
+        summary_line = f"{total} {task_word} • {done} выполнено • {open_count} осталось"
+
+    lines = [
+        "<b>📅 Календарь задач</b>",
+        f"<b>{selected_date.strftime('%d.%m.%Y')}</b>",
+        "✅ всё • 🟡 часть • 🔴 открыто",
+        summary_line,
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])

@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from backend.database import async_session
 from backend.services.diary_service import list_day_diary_entries
 from backend.services.health_service import get_medication_calendar_marks, list_medication_schedule_for_day
+from backend.services.task_service import get_task_calendar_marks
 from backend.services.user_service import get_or_create_user, set_user_dashboard_message_ref
 from bot.states import DashboardStates
 
@@ -287,7 +288,7 @@ async def _render(
     message: Message | None = None,
     notice: str | None = None,
 ) -> None:
-    from ..calendar import _build_calendar_keyboard, _build_calendar_text, _build_diary_calendar_text
+    from ..calendar import _build_calendar_keyboard, _build_calendar_text, _build_diary_calendar_text, _build_task_calendar_text
     from ..core import (
         _build_home_text,
         _build_profile_keyboard,
@@ -312,6 +313,7 @@ async def _render(
     calendar_month = _parse_iso_date(data.get("calendar_month"), _month_start(selected_date))
     view_mode = data.get("view_mode", VIEW_HOME)
     diary_calendar_mode = bool(data.get("diary_calendar_mode", False))
+    task_calendar_mode = bool(data.get("task_calendar_mode", False))
     current_state = await state.get_state()
     task_origin_view = data.get("task_origin_view", VIEW_TASKS)
 
@@ -389,8 +391,22 @@ async def _render(
         text = _build_diary_text(diary_entries, selected_date, "wait_text", notice, total_count=diary_count)
         keyboard = _build_diary_keyboard(selected_date, diary_entries)
     elif view_mode == VIEW_TASKS:
-        text = _build_tasks_text(tasks, selected_date, "main", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
-        keyboard = _build_tasks_keyboard(tasks, selected_date)
+        if task_calendar_mode:
+            month_start = _month_start(calendar_month)
+            next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            month_end = next_month - timedelta(days=1)
+            async with async_session() as session:
+                task_marks_payload = await get_task_calendar_marks(session, user.id, month_start, month_end)
+            selected_day_summary = task_marks_payload.get(selected_date, {"total": len(tasks), "done": sum(1 for task in tasks if task.is_done), "status": "empty"})
+            task_marks = {
+                mark_date: str(payload["status"])
+                for mark_date, payload in task_marks_payload.items()
+            }
+            text = _build_task_calendar_text(selected_date, selected_day_summary, notice)
+            keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="tasks", marks=task_marks)
+        else:
+            text = _build_tasks_text(tasks, selected_date, "main", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
+            keyboard = _build_tasks_keyboard(tasks, selected_date)
     elif view_mode == VIEW_CALENDAR:
         text = _build_calendar_text(selected_date, notice)
         keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="browse")

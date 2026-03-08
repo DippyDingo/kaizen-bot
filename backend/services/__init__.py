@@ -40,6 +40,7 @@ from backend.services.rpg_service import EXP_TABLE, add_exp, calculate_next_leve
 from backend.services.task_service import (
     create_task,
     delete_task,
+    get_task_calendar_marks,
     get_task_details_for_period,
     get_task_totals,
     get_task_totals_for_period,
@@ -68,6 +69,7 @@ __all__ = [
     "calculate_next_level_exp",
     "create_task",
     "delete_task",
+    "get_task_calendar_marks",
     "get_task_totals",
     "list_tasks_for_date",
     "toggle_task_done",
