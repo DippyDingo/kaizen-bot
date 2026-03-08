@@ -103,8 +103,10 @@ class ApiSerializerTests(unittest.TestCase):
         self.assertEqual(80, payload["day"]["water"]["percent"])
         self.assertEqual(88, payload["day"]["sleep"]["percent"])
         self.assertEqual(1, payload["day"]["medications"]["taken"])
+        self.assertEqual(0, payload["day"]["medications"]["pending"])
         self.assertEqual("2026-03-04", payload["week"]["wellbeing"]["best_energy_day"])
         self.assertEqual(2, payload["week"]["workout"]["by_type"]["strength"]["sessions"])
+        self.assertEqual(0, payload["week"]["medications"]["pending_count"])
 
     def test_serialize_stats_payload_returns_structured_blocks(self) -> None:
         payload = serialize_stats_payload(
@@ -160,3 +162,4 @@ class ApiSerializerTests(unittest.TestCase):
         self.assertEqual(80, payload["water"]["percent_of_target"])
         self.assertEqual(83, payload["sleep"]["percent_of_target"])
         self.assertEqual("2026-03-06", payload["wellbeing"]["best_energy_day"])
+        self.assertEqual(0, payload["medications"]["pending_count"])

@@ -2,6 +2,8 @@ from datetime import date
 import unittest
 
 from bot.handlers.single_message_parts.health import (
+    HEALTH_MODE_MEDICATIONS,
+    _build_health_keyboard,
     _medication_status_icon,
     _parse_exact_sleep_input,
     _parse_medication_days_input,
@@ -40,4 +42,24 @@ class HealthHelpersTests(unittest.TestCase):
     def test_medication_status_icon(self) -> None:
         self.assertEqual("\U0001f7e2", _medication_status_icon("taken"))
         self.assertEqual("\U0001f534", _medication_status_icon("skipped"))
-        self.assertEqual("\U0001f534", _medication_status_icon("pending"))
+        self.assertEqual("\U0001f7e1", _medication_status_icon("pending"))
+
+    def test_medication_keyboard_uses_single_status_button_in_one_row(self) -> None:
+        keyboard = _build_health_keyboard(
+            date(2026, 3, 8),
+            mode=HEALTH_MODE_MEDICATIONS,
+            summary={
+                "medication_schedule": [
+                    {
+                        "course_id": 1,
+                        "title": "Magnesium",
+                        "dose": "200 mg",
+                        "intake_time": "08:00",
+                        "status": "skipped",
+                    }
+                ]
+            },
+        )
+
+        medication_row = keyboard.inline_keyboard[3]
+        self.assertEqual(["08:00 Magnesium", "❌", "🗑"], [button.text for button in medication_row])

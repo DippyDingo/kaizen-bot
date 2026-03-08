@@ -287,6 +287,10 @@ async def cb_med_toggle(callback: CallbackQuery, state) -> None:
         notice = f"{_short_medication(course.title)} отмечено как выпито (+10 EXP)"
         if level_change > 0:
             notice += f" | Уровень +{level_change}"
+    elif result_status == "pending":
+        notice = f"Отметка {_short_medication(course.title)} снята. Приём снова ожидает подтверждения"
+        if level_change < 0:
+            notice += f" | Уровень {level_change}"
     else:
         notice = f"Отметка {_short_medication(course.title)} снята. Сейчас это считается пропуском"
         if level_change < 0:
@@ -320,5 +324,5 @@ async def cb_med_delete(callback: CallbackQuery, state) -> None:
 
 @router.callback_query(F.data.startswith("med:item:"))
 async def cb_med_item(callback: CallbackQuery) -> None:
-    await callback.answer("Используй кнопки ниже: выпил, пропуск или удалить курс.")
+    await callback.answer("Справа можно отметить прием или удалить курс.")
 

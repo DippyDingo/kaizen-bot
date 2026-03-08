@@ -162,6 +162,7 @@ def serialize_health_payload(
             "medications": {
                 "total": len(day_medication_schedule),
                 "taken": sum(1 for item in day_medication_schedule if item.get("status") == "taken"),
+                "pending": sum(1 for item in day_medication_schedule if item.get("status") == "pending"),
                 "skipped": sum(1 for item in day_medication_schedule if item.get("status") == "skipped"),
                 "schedule": [
                     {
@@ -232,6 +233,7 @@ def serialize_health_payload(
                 "best_day_logs": _safe_int(week_medication_details.get("best_day_logs")),
                 "top_title": str(week_medication_details.get("top_title") or ""),
                 "taken_count": _safe_int(week_medication_details.get("taken_count")),
+                "pending_count": _safe_int(week_medication_details.get("pending_count")),
                 "skipped_count": _safe_int(week_medication_details.get("skipped_count")),
             },
         },
@@ -332,6 +334,7 @@ def serialize_stats_payload(
         "medications": {
             "total_logs": _safe_int(medication_details.get("total_logs")),
             "taken_count": _safe_int(medication_details.get("taken_count")),
+            "pending_count": _safe_int(medication_details.get("pending_count")),
             "skipped_count": _safe_int(medication_details.get("skipped_count")),
             "unique_titles": _safe_int(medication_details.get("unique_titles")),
             "active_days": _safe_int(medication_details.get("active_days")),

@@ -7,25 +7,93 @@ from backend.models import MedicationCourse, MedicationLog, User
 from backend.services.rpg_service import EXP_TABLE, add_exp, remove_exp
 
 
+def _latest_course_logs_by_day(logs: list[MedicationLog]) -> dict[tuple[date, int], MedicationLog]:
+    latest: dict[tuple[date, int], MedicationLog] = {}
+    for log in logs:
+        if log.course_id is None or log.scheduled_date is None:
+            continue
+        key = (log.scheduled_date, log.course_id)
+        current = latest.get(key)
+        if current is None:
+            latest[key] = log
+            continue
+        current_marker = (current.logged_at, current.created_at, current.id)
+        log_marker = (log.logged_at, log.created_at, log.id)
+        if log_marker >= current_marker:
+            latest[key] = log
+    return latest
+
+
+def _course_is_scheduled_on_day(course: MedicationCourse, target_day: date, *, active_only: bool = True) -> bool:
+    if active_only and not course.is_active:
+        return False
+    return course.start_date <= target_day <= course.end_date
+
+
+def _resolve_medication_item_status(
+    log: MedicationLog | None,
+    target_day: date,
+    *,
+    today: date | None = None,
+) -> str:
+    resolved_today = today or date.today()
+    if log is not None:
+        if log.status == "taken":
+            return "taken"
+        if log.status == "skipped":
+            return "skipped"
+    return "pending" if target_day >= resolved_today else "skipped"
+
+
+def _build_medication_day_buckets(
+    courses: list[MedicationCourse],
+    logs: list[MedicationLog],
+    date_from: date,
+    date_to: date,
+    *,
+    today: date | None = None,
+    active_only: bool = True,
+) -> dict[date, dict[str, int]]:
+    latest_logs = _latest_course_logs_by_day(logs)
+    resolved_today = today or date.today()
+    buckets: dict[date, dict[str, int]] = {}
+
+    day = date_from
+    while day <= date_to:
+        day_courses = [course for course in courses if _course_is_scheduled_on_day(course, day, active_only=active_only)]
+        if day_courses:
+            bucket = {"scheduled": len(day_courses), "taken": 0, "pending": 0, "skipped": 0}
+            for course in day_courses:
+                status = _resolve_medication_item_status(
+                    latest_logs.get((day, course.id)),
+                    day,
+                    today=resolved_today,
+                )
+                bucket[status] += 1
+            buckets[day] = bucket
+        day += timedelta(days=1)
+
+    return buckets
+
+
 def _build_medication_schedule_items(
     courses: list[MedicationCourse],
     logs: list[MedicationLog],
     target_day: date,
+    *,
+    today: date | None = None,
 ) -> list[dict[str, str | int | date]]:
     if not courses:
         return []
 
-    logs_by_course = {
-        log.course_id: log
-        for log in logs
-        if log.course_id is not None and log.scheduled_date == target_day
-    }
+    latest_logs = _latest_course_logs_by_day(logs)
+    resolved_today = today or date.today()
 
     items: list[dict[str, str | int | date]] = []
     for course in sorted(courses, key=lambda item: (item.intake_time, item.title.lower(), item.id)):
-        if not (course.start_date <= target_day <= course.end_date):
+        if not _course_is_scheduled_on_day(course, target_day, active_only=True):
             continue
-        log = logs_by_course.get(course.id)
+        log = latest_logs.get((target_day, course.id))
         items.append(
             {
                 "course_id": course.id,
@@ -35,7 +103,7 @@ def _build_medication_schedule_items(
                 "start_date": course.start_date,
                 "end_date": course.end_date,
                 "days_left": max((course.end_date - target_day).days + 1, 0),
-                "status": "taken" if log and log.status == "taken" else "skipped",
+                "status": _resolve_medication_item_status(log, target_day, today=resolved_today),
             }
         )
     return items
@@ -46,34 +114,18 @@ def _build_medication_calendar_marks(
     logs: list[MedicationLog],
     date_from: date,
     date_to: date,
+    *,
+    today: date | None = None,
 ) -> dict[date, str]:
-    statuses_by_day: dict[date, dict[str, int]] = {}
-
-    day = date_from
-    while day <= date_to:
-        scheduled = sum(1 for course in courses if course.start_date <= day <= course.end_date and course.is_active)
-        if scheduled:
-            statuses_by_day[day] = {"scheduled": scheduled, "taken": 0, "skipped": 0}
-        day += timedelta(days=1)
-
-    for log in logs:
-        scheduled_date = log.scheduled_date
-        if scheduled_date is None or scheduled_date not in statuses_by_day:
-            continue
-        if log.status == "taken":
-            statuses_by_day[scheduled_date]["taken"] += 1
-        elif log.status == "skipped":
-            statuses_by_day[scheduled_date]["skipped"] += 1
-
+    day_buckets = _build_medication_day_buckets(courses, logs, date_from, date_to, today=today, active_only=True)
     marks: dict[date, str] = {}
-    for day_key, values in statuses_by_day.items():
-        scheduled = values["scheduled"]
-        taken = values["taken"]
-        skipped = values["skipped"]
-        if taken == scheduled and scheduled > 0:
+    for day_key, values in day_buckets.items():
+        if values["taken"] == values["scheduled"] and values["scheduled"] > 0:
             marks[day_key] = "done"
-        else:
+        elif values["skipped"] > 0:
             marks[day_key] = "skipped"
+        else:
+            marks[day_key] = "planned"
     return marks
 
 
@@ -82,6 +134,8 @@ def _build_medication_details(
     logs: list[MedicationLog],
     date_from: date,
     date_to: date,
+    *,
+    today: date | None = None,
 ) -> dict[str, int | str]:
     scheduled_by_day: dict[date, int] = {}
     scheduled_by_title: dict[str, int] = {}
@@ -108,20 +162,18 @@ def _build_medication_details(
             "best_day_logs": 0,
             "top_title": "",
             "taken_count": 0,
+            "pending_count": 0,
             "skipped_count": 0,
         }
 
-    taken_count = 0
-
-    for log in logs:
-        if log.status == "taken":
-            taken_count += 1
+    day_buckets = _build_medication_day_buckets(courses, logs, date_from, date_to, today=today, active_only=False)
+    taken_count = sum(values["taken"] for values in day_buckets.values())
+    pending_count = sum(values["pending"] for values in day_buckets.values())
+    skipped_count = sum(values["skipped"] for values in day_buckets.values())
 
     top_title = ""
     if scheduled_by_title:
         top_title = sorted(scheduled_by_title.items(), key=lambda item: (-item[1], item[0].lower()))[0][0]
-
-    skipped_count = max(total_scheduled - taken_count, 0)
 
     return {
         "total_logs": total_scheduled,
@@ -130,6 +182,7 @@ def _build_medication_details(
         "best_day_logs": max(scheduled_by_day.values()) if scheduled_by_day else 0,
         "top_title": top_title,
         "taken_count": taken_count,
+        "pending_count": pending_count,
         "skipped_count": skipped_count,
     }
 
@@ -257,27 +310,33 @@ async def toggle_medication_intake_status(
         return None, None, 0
 
     existing_result = await session.execute(
-        select(MedicationLog).where(
+        select(MedicationLog)
+        .where(
             and_(
                 MedicationLog.user_id == user.id,
                 MedicationLog.course_id == course.id,
                 MedicationLog.scheduled_date == target_day,
             )
         )
+        .order_by(MedicationLog.logged_at.desc(), MedicationLog.created_at.desc(), MedicationLog.id.desc())
     )
-    existing_log = existing_result.scalar_one_or_none()
+    existing_logs = list(existing_result.scalars())
+    existing_log = existing_logs[0] if existing_logs else None
 
     if existing_log and existing_log.status == status:
-        await session.delete(existing_log)
+        for log in existing_logs:
+            await session.delete(log)
         level_change = -remove_exp(user, EXP_TABLE["medication_logged"])
         await session.commit()
         await session.refresh(user)
-        return "skipped", course, level_change
+        return _resolve_medication_item_status(None, target_day), course, level_change
 
     if existing_log:
         previous_status = existing_log.status
         existing_log.status = status
         existing_log.logged_at = datetime.utcnow()
+        for stale_log in existing_logs[1:]:
+            await session.delete(stale_log)
         level_change = add_exp(user, EXP_TABLE["medication_logged"]) if previous_status != "taken" else 0
         await session.commit()
         await session.refresh(user)

@@ -110,7 +110,7 @@ def _medication_status_icon(status: str) -> str:
     return {
         "taken": "🟢",
         "skipped": "🔴",
-        "pending": "🔴",
+        "pending": "🟡",
     }.get(status, "🟡")
 
 
@@ -198,16 +198,12 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
             rows.append(
                 [
                     InlineKeyboardButton(text=title, callback_data=f"med:item:{course_id}"),
-                    InlineKeyboardButton(text="🗑", callback_data=f"med:delete:{course_id}"),
-                ]
-            )
-            rows.append(
-                [
                     InlineKeyboardButton(
-                        text="✅ Выпил",
+                        text="✅" if status == "taken" else "❌",
                         callback_data=f"med:toggle:{course_id}:taken",
                         style="success" if status == "taken" else "danger",
                     ),
+                    InlineKeyboardButton(text="🗑", callback_data=f"med:delete:{course_id}"),
                 ]
             )
         rows.append([InlineKeyboardButton(text="↩️", callback_data="med:close")])
@@ -283,6 +279,7 @@ def _build_health_text(
     day_workout_total = int(summary.get("day_workout_total", 0))
     day_medication_total = int(summary.get("day_medication_total", 0))
     day_medication_taken = int(summary.get("day_medication_taken", 0))
+    day_medication_pending = int(summary.get("day_medication_pending", 0))
     day_medication_skipped = int(summary.get("day_medication_skipped", 0))
     day_medication_unique = int(summary.get("day_medication_unique", 0))
     day_energy_level = int(summary.get("day_energy_level", 0))
@@ -312,6 +309,8 @@ def _build_health_text(
             "",
             f"• Запланировано: <b>{day_medication_total}</b>",
             f"• Выпито: <b>{day_medication_taken}</b>",
+            f"• Не отмечено: <b>{day_medication_pending + day_medication_skipped}</b>",
+            f"• Ожидают: <b>{day_medication_pending}</b>",
             f"• Пропусков: <b>{day_medication_skipped}</b>",
             f"• Уникальных: <b>{day_medication_unique}</b>",
             "",

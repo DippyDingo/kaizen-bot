@@ -64,6 +64,7 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "day_has_wellbeing": bool(day_wellbeing["has_entry"]),
         "day_medication_total": len(day_medication_schedule),
         "day_medication_taken": sum(1 for item in day_medication_schedule if item["status"] == "taken"),
+        "day_medication_pending": sum(1 for item in day_medication_schedule if item["status"] == "pending"),
         "day_medication_skipped": sum(1 for item in day_medication_schedule if item["status"] == "skipped"),
         "day_medication_unique": len({str(item["title"]) for item in day_medication_schedule}),
         "day_recent_medications": [f"{item['intake_time']} {item['title']} ({item['dose']})" for item in day_medication_schedule[:3]],
@@ -99,6 +100,7 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "week_medication_unique": int(week_medication_details["unique_titles"]),
         "week_best_medication_day": int(week_medication_details["best_day_logs"]),
         "week_top_medication_title": str(week_medication_details["top_title"]),
+        "week_medication_pending": int(week_medication_details.get("pending_count", 0)),
     }
 
 
