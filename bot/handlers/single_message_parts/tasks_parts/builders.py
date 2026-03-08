@@ -54,6 +54,14 @@ def _build_priority_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def _build_task_cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="↩️ Отмена", callback_data="task:cancel")],
+        ]
+    )
+
+
 def _build_tasks_text(
     tasks: list,
     selected_date: date,

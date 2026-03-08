@@ -182,6 +182,6 @@ async def msg_chat_navigation(message: Message, state: FSMContext) -> None:
         target_view,
         delete_source_message=True,
         force_keyboard=False,
-        relocate_dashboard=True,
+        relocate_dashboard=False,
         entrypoint="chat_menu",
     )

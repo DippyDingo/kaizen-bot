@@ -13,16 +13,17 @@ from backend.services.task_service import create_task, delete_task, toggle_task_
 from backend.services.user_service import get_or_create_user
 from bot.states import DashboardStates
 
-from ..common import PRIORITY_TEXT, VIEW_TASKS, _month_start, _parse_iso_date, _render, _reset_context, router
+from ..common import PRIORITY_TEXT, VIEW_HOME, VIEW_TASKS, _month_start, _parse_iso_date, _render, _reset_context, router
 
 
 async def _finalize_task(callback: CallbackQuery, state: FSMContext, task_date: date) -> None:
     data = await state.get_data()
     title = (data.get("pending_task_title") or "").strip()
     priority = data.get("pending_task_priority")
+    target_view = data.get("task_origin_view", VIEW_TASKS)
 
     if not title or priority not in PRIORITY_TEXT:
-        await _reset_context(state, view_mode=VIEW_TASKS)
+        await _reset_context(state, view_mode=target_view)
         await _render(from_user=callback.from_user, state=state, callback=callback, notice="Не удалось создать задачу")
         await callback.answer()
         return
@@ -41,7 +42,7 @@ async def _finalize_task(callback: CallbackQuery, state: FSMContext, task_date: 
     await state.update_data(
         selected_date=task_date.isoformat(),
         calendar_month=_month_start(task_date).isoformat(),
-        view_mode=VIEW_TASKS,
+        view_mode=target_view,
     )
     await _render(
         from_user=callback.from_user,
@@ -54,16 +55,27 @@ async def _finalize_task(callback: CallbackQuery, state: FSMContext, task_date: 
 
 @router.callback_query(F.data == "task:add")
 async def cb_task_add(callback: CallbackQuery, state: FSMContext) -> None:
-    selected_date, calendar_month, _ = await _reset_context(state, view_mode=VIEW_TASKS)
+    data = await state.get_data()
+    origin_view = data.get("view_mode", VIEW_TASKS)
+    if origin_view not in {VIEW_HOME, VIEW_TASKS}:
+        origin_view = VIEW_TASKS
+    selected_date, calendar_month, _ = await _reset_context(state, view_mode=origin_view)
     await state.set_state(DashboardStates.waiting_task_title)
-    await state.update_data(selected_date=selected_date.isoformat(), calendar_month=calendar_month.isoformat(), view_mode=VIEW_TASKS)
+    await state.update_data(
+        selected_date=selected_date.isoformat(),
+        calendar_month=calendar_month.isoformat(),
+        view_mode=origin_view,
+        task_origin_view=origin_view,
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer("Введи название")
 
 
 @router.callback_query(F.data == "task:cancel")
 async def cb_task_cancel(callback: CallbackQuery, state: FSMContext) -> None:
-    await _reset_context(state, view_mode=VIEW_TASKS)
+    data = await state.get_data()
+    target_view = data.get("task_origin_view", VIEW_TASKS)
+    await _reset_context(state, view_mode=target_view)
     await _render(from_user=callback.from_user, state=state, callback=callback, notice="Добавление отменено")
     await callback.answer()
 

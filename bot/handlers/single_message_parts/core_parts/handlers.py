@@ -359,9 +359,8 @@ async def cb_stats_period(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer("Период обновлен")
 
 
-@router.message()
+@router.message(StateFilter(None))
 async def fallback(message: Message, state: FSMContext) -> None:
-    current_state = await state.get_state()
     data = await state.get_data()
     log_ui_event(
         "fallback_render",
@@ -370,24 +369,10 @@ async def fallback(message: Message, state: FSMContext) -> None:
         view_mode=data.get("view_mode", VIEW_HOME),
         entrypoint="fallback",
     )
-    if current_state not in {
-        DashboardStates.waiting_display_name.state,
-        DashboardStates.waiting_water_amount_text.state,
-        DashboardStates.waiting_sleep_exact_time.state,
-        DashboardStates.waiting_medication_title.state,
-        DashboardStates.waiting_medication_dose.state,
-        DashboardStates.waiting_medication_time_text.state,
-        DashboardStates.waiting_medication_days_text.state,
-        DashboardStates.waiting_workout_duration_text.state,
-        DashboardStates.waiting_daily_water_target.state,
-        DashboardStates.waiting_daily_workout_target.state,
-        DashboardStates.waiting_task_title.state,
-        DashboardStates.waiting_diary_text.state,
-    }:
-        try:
-            await message.delete()
-        except TelegramBadRequest:
-            pass
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
 
     await _render(
         from_user=message.from_user,

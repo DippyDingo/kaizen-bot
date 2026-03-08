@@ -19,6 +19,7 @@ from .constants import (
     CONFIGURED_REPLY_KEYBOARD_CHATS,
     DASHBOARD_MESSAGES,
     MAX_TRACKED_OUTPUT_MESSAGES,
+    PRIORITY_TEXT,
     VIEW_CALENDAR,
     VIEW_DIARY,
     VIEW_HEALTH,
@@ -303,7 +304,7 @@ async def _render(
         _build_health_keyboard,
         _build_health_text,
     )
-    from ..tasks import _build_priority_keyboard, _build_tasks_keyboard, _build_tasks_text
+    from ..tasks import _build_priority_keyboard, _build_task_cancel_keyboard, _build_tasks_keyboard, _build_tasks_text
     from ..water import _build_water_keyboard, _build_water_text
 
     data = await state.get_data()
@@ -312,6 +313,7 @@ async def _render(
     view_mode = data.get("view_mode", VIEW_HOME)
     diary_calendar_mode = bool(data.get("diary_calendar_mode", False))
     current_state = await state.get_state()
+    task_origin_view = data.get("task_origin_view", VIEW_TASKS)
 
     user, tasks, water_ml, sleep_minutes, diary_count = await _load_user_and_metrics(from_user, selected_date)
     diary_entries: list = []
@@ -320,8 +322,13 @@ async def _render(
             diary_entries = await list_day_diary_entries(session, user.id, selected_date, limit=20)
 
     if current_state == DashboardStates.waiting_task_title.state:
-        text = _build_tasks_text(tasks, selected_date, "wait_title", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
-        keyboard = _build_tasks_keyboard(tasks, selected_date)
+        if task_origin_view == VIEW_HOME:
+            wait_notice = notice or "Новая задача: отправь название."
+            text = _build_home_text(user, tasks, water_ml, sleep_minutes, diary_count, selected_date, wait_notice)
+            keyboard = _build_task_cancel_keyboard()
+        else:
+            text = _build_tasks_text(tasks, selected_date, "wait_title", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
+            keyboard = _build_tasks_keyboard(tasks, selected_date)
     elif current_state == DashboardStates.waiting_water_amount_text.state:
         text = _build_water_text(user, water_ml, selected_date, notice, mode="wait_amount")
         keyboard = _build_water_keyboard(selected_date, mode="wait_amount")
@@ -361,10 +368,22 @@ async def _render(
         text = _build_settings_text(user, notice=notice, mode="wait_workout")
         keyboard = _build_settings_keyboard()
     elif current_state == DashboardStates.waiting_task_priority.state:
-        text = _build_tasks_text(tasks, selected_date, "wait_priority", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
+        if task_origin_view == VIEW_HOME:
+            task_title = html.escape(str(data.get("pending_task_title") or ""))
+            wait_notice = notice or f"Новая задача: {task_title}. Выбери приоритет."
+            text = _build_home_text(user, tasks, water_ml, sleep_minutes, diary_count, selected_date, wait_notice)
+        else:
+            text = _build_tasks_text(tasks, selected_date, "wait_priority", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_priority_keyboard()
     elif current_state == DashboardStates.waiting_task_date.state:
-        text = _build_tasks_text(tasks, selected_date, "wait_task_date", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
+        if task_origin_view == VIEW_HOME:
+            task_title = html.escape(str(data.get("pending_task_title") or ""))
+            task_priority = str(data.get("pending_task_priority") or "")
+            priority_text = html.escape(str(PRIORITY_TEXT.get(task_priority, "")))
+            wait_notice = notice or f"Новая задача: {task_title}. Приоритет: {priority_text}. Выбери дату."
+            text = _build_home_text(user, tasks, water_ml, sleep_minutes, diary_count, selected_date, wait_notice)
+        else:
+            text = _build_tasks_text(tasks, selected_date, "wait_task_date", data.get("pending_task_title"), data.get("pending_task_priority"), notice)
         keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="create")
     elif current_state == DashboardStates.waiting_diary_text.state:
         text = _build_diary_text(diary_entries, selected_date, "wait_text", notice, total_count=diary_count)
