@@ -351,6 +351,7 @@ async def _render(
         health_summary["pending_medication_title"] = data.get("pending_medication_title")
         health_summary["pending_medication_time"] = data.get("pending_medication_time")
         health_summary["pending_energy_level"] = data.get("pending_energy_level")
+        health_summary["health_return_mode"] = data.get("health_return_mode")
         health_summary["daily_water_target_ml"] = user.daily_water_target_ml
         health_summary["daily_workout_target_min"] = user.daily_workout_target_min
         text = _build_health_text(
@@ -430,6 +431,7 @@ async def _render(
         health_summary["pending_medication_title"] = data.get("pending_medication_title")
         health_summary["pending_medication_time"] = data.get("pending_medication_time")
         health_summary["pending_energy_level"] = data.get("pending_energy_level")
+        health_summary["health_return_mode"] = data.get("health_return_mode")
         health_summary["daily_water_target_ml"] = user.daily_water_target_ml
         health_summary["daily_workout_target_min"] = user.daily_workout_target_min
         if health_mode == HEALTH_MODE_MEDICATION_CALENDAR:

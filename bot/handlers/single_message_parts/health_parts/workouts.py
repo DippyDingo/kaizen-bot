@@ -11,14 +11,37 @@ from backend.services.user_service import get_or_create_user
 from bot.states import DashboardStates
 
 from ..common import VIEW_HEALTH, _parse_iso_date, _render, router
-from .builders import HEALTH_MODE_WORKOUT_DURATION, HEALTH_MODE_WORKOUT_TYPE, WORKOUT_DURATION_OPTIONS, WORKOUT_TYPE_LABELS, WORKOUT_TYPE_SHORT, _format_minutes, _parse_workout_duration_input
-from .state import _reset_health_mode
+from .builders import (
+    HEALTH_MODE_WORKOUT_DURATION,
+    HEALTH_MODE_WORKOUT_PANEL,
+    HEALTH_MODE_WORKOUT_TYPE,
+    WORKOUT_DURATION_OPTIONS,
+    WORKOUT_TYPE_LABELS,
+    WORKOUT_TYPE_SHORT,
+    _format_minutes,
+    _parse_workout_duration_input,
+)
+from .state import _reset_health_mode, _resolve_health_summary_mode
+
+
+def _workout_return_mode_from_data(data: dict) -> str:
+    if data.get("health_mode") == HEALTH_MODE_WORKOUT_PANEL:
+        return HEALTH_MODE_WORKOUT_PANEL
+    if data.get("health_return_mode") == HEALTH_MODE_WORKOUT_PANEL:
+        return HEALTH_MODE_WORKOUT_PANEL
+    return _resolve_health_summary_mode(data)
 
 
 @router.callback_query(F.data == "workout:start")
 async def cb_workout_start(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(None)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_WORKOUT_TYPE, pending_workout_type=None)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_WORKOUT_TYPE,
+        health_return_mode=_workout_return_mode_from_data(data),
+        pending_workout_type=None,
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer("Выбери тип")
 
@@ -32,8 +55,13 @@ async def cb_workout_cancel(callback: CallbackQuery, state) -> None:
 
 @router.callback_query(F.data == "workout:back")
 async def cb_workout_back(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(None)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_WORKOUT_TYPE)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_WORKOUT_TYPE,
+        health_return_mode=_workout_return_mode_from_data(data),
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer()
 
@@ -58,8 +86,14 @@ async def cb_workout_type(callback: CallbackQuery, state) -> None:
         await callback.answer("Ошибка")
         return
 
+    data = await state.get_data()
     await state.set_state(None)
-    await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_WORKOUT_DURATION, pending_workout_type=workout_type)
+    await state.update_data(
+        view_mode=VIEW_HEALTH,
+        health_mode=HEALTH_MODE_WORKOUT_DURATION,
+        health_return_mode=_workout_return_mode_from_data(data),
+        pending_workout_type=workout_type,
+    )
     await _render(from_user=callback.from_user, state=state, callback=callback)
     await callback.answer("Выбери длительность")
 

@@ -14,6 +14,7 @@ from ..common import VIEW_HEALTH, _parse_iso_date, _render, router
 from .builders import (
     HEALTH_MODE_SLEEP_DURATION,
     HEALTH_MODE_SLEEP_EXACT,
+    HEALTH_MODE_SLEEP_PANEL,
     HEALTH_MODE_SLEEP_QUALITY,
     SLEEP_DURATION_OPTIONS,
     SLEEP_QUALITY_LABELS,
@@ -21,15 +22,25 @@ from .builders import (
     _parse_exact_sleep_input,
     _sleep_duration_label,
 )
-from .state import _reset_health_mode
+from .state import _reset_health_mode, _resolve_health_summary_mode
+
+
+def _sleep_return_mode_from_data(data: dict) -> str:
+    if data.get("health_mode") == HEALTH_MODE_SLEEP_PANEL:
+        return HEALTH_MODE_SLEEP_PANEL
+    if data.get("health_return_mode") == HEALTH_MODE_SLEEP_PANEL:
+        return HEALTH_MODE_SLEEP_PANEL
+    return _resolve_health_summary_mode(data)
 
 
 @router.callback_query(F.data == "sleep:start")
 async def cb_sleep_start(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(None)
     await state.update_data(
         view_mode=VIEW_HEALTH,
         health_mode=HEALTH_MODE_SLEEP_DURATION,
+        health_return_mode=_sleep_return_mode_from_data(data),
         pending_sleep_minutes=None,
         pending_sleep_exact_fell=None,
         pending_sleep_exact_wake=None,
@@ -63,6 +74,7 @@ async def cb_sleep_back(callback: CallbackQuery, state) -> None:
         await state.update_data(
             view_mode=VIEW_HEALTH,
             health_mode=HEALTH_MODE_SLEEP_DURATION,
+            health_return_mode=_sleep_return_mode_from_data(data),
             pending_sleep_exact_fell=None,
             pending_sleep_exact_wake=None,
         )
@@ -72,10 +84,12 @@ async def cb_sleep_back(callback: CallbackQuery, state) -> None:
 
 @router.callback_query(F.data == "sleep:exact")
 async def cb_sleep_exact(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(DashboardStates.waiting_sleep_exact_time)
     await state.update_data(
         view_mode=VIEW_HEALTH,
         health_mode=HEALTH_MODE_SLEEP_EXACT,
+        health_return_mode=_sleep_return_mode_from_data(data),
         pending_sleep_minutes=None,
         pending_sleep_exact_fell=None,
         pending_sleep_exact_wake=None,
@@ -86,10 +100,12 @@ async def cb_sleep_exact(callback: CallbackQuery, state) -> None:
 
 @router.callback_query(F.data == "sleep:exact:cancel")
 async def cb_sleep_exact_cancel(callback: CallbackQuery, state) -> None:
+    data = await state.get_data()
     await state.set_state(None)
     await state.update_data(
         view_mode=VIEW_HEALTH,
         health_mode=HEALTH_MODE_SLEEP_DURATION,
+        health_return_mode=_sleep_return_mode_from_data(data),
         pending_sleep_minutes=None,
         pending_sleep_exact_fell=None,
         pending_sleep_exact_wake=None,
@@ -110,10 +126,12 @@ async def cb_sleep_duration(callback: CallbackQuery, state) -> None:
         await callback.answer("Ошибка")
         return
 
+    data = await state.get_data()
     await state.set_state(None)
     await state.update_data(
         view_mode=VIEW_HEALTH,
         health_mode=HEALTH_MODE_SLEEP_QUALITY,
+        health_return_mode=_sleep_return_mode_from_data(data),
         pending_sleep_minutes=duration_minutes,
         pending_sleep_exact_fell=None,
         pending_sleep_exact_wake=None,
@@ -192,13 +210,14 @@ async def msg_sleep_exact_time(message: Message, state) -> None:
     duration_minutes = int((woke_up_at - fell_asleep_at).total_seconds() // 60)
     if duration_minutes <= 0:
         await state.update_data(view_mode=VIEW_HEALTH, health_mode=HEALTH_MODE_SLEEP_EXACT, pending_sleep_exact_fell=None, pending_sleep_exact_wake=None)
-        await _render(from_user=message.from_user, state=state, message=message, notice="Подъем должен быть позже засыпания.")
+        await _render(from_user=message.from_user, state=state, message=message, notice="Подъём должен быть позже засыпания.")
         return
 
     await state.set_state(None)
     await state.update_data(
         view_mode=VIEW_HEALTH,
         health_mode=HEALTH_MODE_SLEEP_QUALITY,
+        health_return_mode=_sleep_return_mode_from_data(data),
         pending_sleep_minutes=duration_minutes,
         pending_sleep_exact_fell=fell_asleep_at.isoformat(),
         pending_sleep_exact_wake=woke_up_at.isoformat(),

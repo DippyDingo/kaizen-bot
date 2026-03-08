@@ -6,10 +6,12 @@ from datetime import date, datetime, time, timedelta
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ..common import _build_bar_caption, _build_goal_bar, _clamp_percent, _date_nav_row
+from ..common import _build_bar_caption, _build_goal_bar, _date_nav_row
 
 HEALTH_MODE_SUMMARY_DAY = "summary_day"
 HEALTH_MODE_SUMMARY_WEEK = "summary_week"
+HEALTH_MODE_SLEEP_PANEL = "sleep_panel"
+HEALTH_MODE_WORKOUT_PANEL = "workout_panel"
 HEALTH_MODE_MEDICATIONS = "medications"
 HEALTH_MODE_MEDICATION_CALENDAR = "medication_calendar"
 HEALTH_MODE_SLEEP_DURATION = "sleep_duration"
@@ -41,6 +43,8 @@ WORKOUT_DURATION_OPTIONS = (15, 30, 45, 60)
 DAILY_WATER_TARGET_ML = 2500
 DAILY_SLEEP_TARGET_MIN = 480
 DAILY_WORKOUT_TARGET_MIN = 30
+
+HEALTH_SUMMARY_MODES = {HEALTH_MODE_SUMMARY_DAY, HEALTH_MODE_SUMMARY_WEEK}
 
 
 def _format_minutes(total_minutes: int) -> str:
@@ -116,19 +120,21 @@ def _medication_status_icon(status: str) -> str:
 
 def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMARY_DAY, summary: dict | None = None) -> InlineKeyboardMarkup:
     summary = summary or {}
-    rows: list[list[InlineKeyboardButton]] = [
-        _date_nav_row(selected_date),
-        [
-            InlineKeyboardButton(
-                text="• День" if mode == HEALTH_MODE_SUMMARY_DAY else "День",
-                callback_data="health:mode:day",
-            ),
-            InlineKeyboardButton(
-                text="• Неделя" if mode == HEALTH_MODE_SUMMARY_WEEK else "Неделя",
-                callback_data="health:mode:week",
-            ),
-        ],
-    ]
+    rows: list[list[InlineKeyboardButton]] = [_date_nav_row(selected_date)]
+
+    if mode in HEALTH_SUMMARY_MODES:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="• День" if mode == HEALTH_MODE_SUMMARY_DAY else "День",
+                    callback_data="health:mode:day",
+                ),
+                InlineKeyboardButton(
+                    text="• Неделя" if mode == HEALTH_MODE_SUMMARY_WEEK else "Неделя",
+                    callback_data="health:mode:week",
+                ),
+            ]
+        )
 
     if mode == HEALTH_MODE_SLEEP_DURATION:
         rows.extend(
@@ -137,6 +143,16 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
                 [InlineKeyboardButton(text="8ч", callback_data="sleep:dur:480"), InlineKeyboardButton(text="9ч", callback_data="sleep:dur:540"), InlineKeyboardButton(text="10ч", callback_data="sleep:dur:600")],
                 [InlineKeyboardButton(text="🕒 Точное время", callback_data="sleep:exact")],
                 [InlineKeyboardButton(text="↩️", callback_data="sleep:cancel")],
+            ]
+        )
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    if mode == HEALTH_MODE_SLEEP_PANEL:
+        rows.extend(
+            [
+                [InlineKeyboardButton(text="➕ Добавить сон", callback_data="sleep:start")],
+                [InlineKeyboardButton(text="↩️ Отменить последний", callback_data="sleep:undo")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="health:back")],
             ]
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -219,6 +235,16 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
         )
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
+    if mode == HEALTH_MODE_WORKOUT_PANEL:
+        rows.extend(
+            [
+                [InlineKeyboardButton(text="➕ Добавить тренировку", callback_data="workout:start")],
+                [InlineKeyboardButton(text="↩️ Отменить последнюю", callback_data="workout:undo")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="health:back")],
+            ]
+        )
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
     if mode == HEALTH_MODE_WORKOUT_DURATION:
         rows.extend(
             [
@@ -252,9 +278,8 @@ def _build_health_keyboard(selected_date: date, *, mode: str = HEALTH_MODE_SUMMA
 
     rows.extend(
         [
-            [InlineKeyboardButton(text="😴 Добавить сон", callback_data="sleep:start"), InlineKeyboardButton(text="↩️", callback_data="sleep:undo")],
-            [InlineKeyboardButton(text="🏃 Добавить тренировку", callback_data="workout:start"), InlineKeyboardButton(text="↩️", callback_data="workout:undo")],
-            [InlineKeyboardButton(text="💧 Вода", callback_data="health:water"), InlineKeyboardButton(text="💊 Лекарства", callback_data="health:mode:meds")],
+            [InlineKeyboardButton(text="💧 Вода", callback_data="health:water"), InlineKeyboardButton(text="😴 Сон", callback_data="health:mode:sleep_panel")],
+            [InlineKeyboardButton(text="🏃 Тренировки", callback_data="health:mode:workout_panel"), InlineKeyboardButton(text="💊 Лекарства", callback_data="health:mode:meds")],
             [InlineKeyboardButton(text="🧠 Состояние", callback_data="wellbeing:start")],
         ]
     )
@@ -272,11 +297,12 @@ def _build_health_text(
     summary: dict | None = None,
 ) -> str:
     summary = summary or {}
+    return_mode = str(summary.get("health_return_mode") or "")
     water_target_ml = int(summary.get("daily_water_target_ml", DAILY_WATER_TARGET_ML))
     workout_target_min = int(summary.get("daily_workout_target_min", DAILY_WORKOUT_TARGET_MIN))
-    stamina_percent = _clamp_percent((sleep_minutes / DAILY_SLEEP_TARGET_MIN) * 100)
 
     day_workout_total = int(summary.get("day_workout_total", 0))
+    day_workout_sessions = int(summary.get("day_workout_sessions", 0))
     day_medication_total = int(summary.get("day_medication_total", 0))
     day_medication_taken = int(summary.get("day_medication_taken", 0))
     day_medication_pending = int(summary.get("day_medication_pending", 0))
@@ -284,7 +310,6 @@ def _build_health_text(
     day_medication_unique = int(summary.get("day_medication_unique", 0))
     day_energy_level = int(summary.get("day_energy_level", 0))
     day_stress_level = int(summary.get("day_stress_level", 0))
-    day_recent_medications = list(summary.get("day_recent_medications", []))
     medication_schedule = list(summary.get("medication_schedule", []))
     day_quality = float(summary.get("day_avg_quality", 0))
     day_water_bar, day_water_percent = _build_goal_bar(water_ml, water_target_ml, "water")
@@ -301,6 +326,22 @@ def _build_health_text(
     week_water_bar, week_water_percent = _build_goal_bar(week_water_total, water_target_ml * 7, "water")
     week_sleep_bar, week_sleep_percent = _build_goal_bar(week_sleep_total, DAILY_SLEEP_TARGET_MIN * 7, "sleep")
     week_workout_bar, week_workout_percent = _build_goal_bar(week_workout_total, workout_target_min * 7, "workout")
+
+    day_medication_text = (
+        f"<b>{day_medication_taken}/{day_medication_total}</b> выпито"
+        if day_medication_total
+        else "<b>нет приёмов</b>"
+    )
+    day_wellbeing_text = (
+        f"<b>⚡ {_format_level(day_energy_level)} • 😵 {_format_level(day_stress_level)}</b>"
+        if summary.get("day_has_wellbeing")
+        else "<b>не отмечено</b>"
+    )
+    week_wellbeing_text = (
+        f"<b>⚡ {week_avg_energy:.1f}/5 • 😵 {week_avg_stress:.1f}/5</b>"
+        if summary.get("week_wellbeing_active_days", 0)
+        else "<b>нет данных</b>"
+    )
 
     if mode == HEALTH_MODE_MEDICATIONS:
         lines = [
@@ -335,83 +376,114 @@ def _build_health_text(
                     "• Выбери дату стрелками или открой календарь.",
                 ]
             )
+    elif mode == HEALTH_MODE_SLEEP_PANEL:
+        lines = [
+            "<b>😴 Сон</b>",
+            f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
+            "",
+            f"• За день: <b>{_format_minutes(sleep_minutes)}</b>",
+            f"• {_build_bar_caption('Сон', day_sleep_bar, f'{day_sleep_percent}%')}",
+            f"• Качество: <b>{day_quality:.1f}/5</b>" if day_quality else "• Качество: <b>нет данных</b>",
+        ]
+    elif mode == HEALTH_MODE_WORKOUT_PANEL:
+        lines = [
+            "<b>🏃 Тренировки</b>",
+            f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
+            "",
+            f"• За день: <b>{_format_minutes(day_workout_total)}</b>",
+            f"• {_build_bar_caption('Тренировки', day_workout_bar, f'{day_workout_percent}%')}",
+            f"• Сессий: <b>{day_workout_sessions}</b>",
+        ]
     elif mode == HEALTH_MODE_SUMMARY_WEEK:
         lines = [
-            "<b>❤️ ЗДОРОВЬЕ • НЕДЕЛЯ</b>",
+            "<b>❤️ Здоровье • неделя</b>",
             f"Период: <b>{week_from.strftime('%d.%m')} - {selected_date.strftime('%d.%m.%Y')}</b>",
             "",
-            "<b>💧 Вода</b>",
-            f"• Сумма: <b>{week_water_total} мл</b>",
+            f"• 💧 Вода: <b>{week_water_total} мл</b> • {summary.get('week_water_avg', 0)} мл/д",
             f"• {_build_bar_caption('Вода', week_water_bar, f'{week_water_percent}%')}",
-            f"• Среднее: <b>{summary.get('week_water_avg', 0)} мл/д</b>",
-            f"• Активных дней: <b>{summary.get('week_water_active_days', 0)}/7</b>",
-            f"• Лучший день: <b>{summary.get('week_best_water_day', 0)} мл</b>",
             "",
-            "<b>😴 Сон</b>",
-            f"• Сумма: <b>{_format_minutes(week_sleep_total)}</b>",
+            f"• 😴 Сон: <b>{_format_minutes(week_sleep_total)}</b> • {_format_minutes(int(summary.get('week_sleep_avg', 0)))}/д",
             f"• {_build_bar_caption('Сон', week_sleep_bar, f'{week_sleep_percent}%')}",
-            f"• Среднее: <b>{_format_minutes(int(summary.get('week_sleep_avg', 0)))}/д</b>",
-            f"• Качество: <b>{float(summary.get('week_avg_quality', 0)):.1f}/5</b>" if summary.get("week_avg_quality", 0) else "• Качество: <b>нет данных</b>",
-            f"• Активных дней: <b>{summary.get('week_sleep_active_days', 0)}/7</b>",
-            f"• Лучший день: <b>{_format_minutes(int(summary.get('week_best_sleep_day', 0)))}</b>",
             "",
-            "<b>🏃 Тренировки</b>",
-            f"• Сумма: <b>{_format_minutes(week_workout_total)}</b>",
+            f"• 🏃 Тренировки: <b>{_format_minutes(week_workout_total)}</b> • {summary.get('week_workout_sessions', 0)} сессий",
             f"• {_build_bar_caption('Тренировки', week_workout_bar, f'{week_workout_percent}%')}",
-            f"• Среднее: <b>{_format_minutes(int(summary.get('week_workout_avg', 0)))}/д</b>",
-            f"• Сессий: <b>{summary.get('week_workout_sessions', 0)}</b>",
-            f"• Активных дней: <b>{summary.get('week_workout_active_days', 0)}/7</b>",
-            f"• Лучший день: <b>{_format_minutes(int(summary.get('week_best_workout_day', 0)))}</b>",
-            f"• По типам: <b>💪 {summary.get('week_strength_count', 0)}</b> | <b>🏃 {summary.get('week_cardio_count', 0)}</b> | <b>🧘 {summary.get('week_mobility_count', 0)}</b>",
-            f"• Минуты по типам: <b>💪 {summary.get('week_strength_minutes', 0)}</b> | <b>🏃 {summary.get('week_cardio_minutes', 0)}</b> | <b>🧘 {summary.get('week_mobility_minutes', 0)}</b>",
             "",
-            "<b>💊 Лекарства</b>",
-            f"• Приёмов: <b>{week_medication_total}</b>",
-            f"• Активных дней: <b>{summary.get('week_medication_active_days', 0)}/7</b>",
-            f"• Уникальных: <b>{summary.get('week_medication_unique', 0)}</b>",
-            f"• Лучший день: <b>{summary.get('week_best_medication_day', 0)}</b> приём(ов)",
-            f"• Чаще всего: <b>{html.escape(str(summary.get('week_top_medication_title')))}</b>" if summary.get("week_top_medication_title") else "• Чаще всего: <b>нет данных</b>",
+            f"• 💊 Лекарства: <b>{week_medication_total}</b> приёмов • {summary.get('week_medication_active_days', 0)} активных дн.",
             "",
-            "<b>🧠 Состояние</b>",
-            f"• ⚡ Средняя энергия: <b>{week_avg_energy:.1f}/5</b>" if week_avg_energy else "• ⚡ Средняя энергия: <b>нет данных</b>",
-            f"• 😵 Средний стресс: <b>{week_avg_stress:.1f}/5</b>" if week_avg_stress else "• 😵 Средний стресс: <b>нет данных</b>",
-            f"• 🗓 Активных дней: <b>{summary.get('week_wellbeing_active_days', 0)}/7</b>",
+            f"• 🧠 Состояние: {week_wellbeing_text}",
+            f"• Активных дней: <b>{summary.get('week_wellbeing_active_days', 0)}/7</b>",
         ]
     else:
         lines = [
-            "<b>❤️ ЗДОРОВЬЕ • ДЕНЬ</b>",
+            "<b>❤️ Здоровье</b>",
             f"Дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
             "",
-            "<b>Сегодня</b>",
             f"• 💧 Вода: <b>{water_ml} мл</b>",
             f"• {_build_bar_caption('Вода', day_water_bar, f'{day_water_percent}%')}",
             f"• 😴 Сон: <b>{_format_minutes(sleep_minutes)}</b>",
             f"• {_build_bar_caption('Сон', day_sleep_bar, f'{day_sleep_percent}%')}",
-            f"• ⚡ Стамина: <b>{stamina_percent}%</b>",
             f"• 🏃 Тренировки: <b>{_format_minutes(day_workout_total)}</b>",
             f"• {_build_bar_caption('Тренировки', day_workout_bar, f'{day_workout_percent}%')}",
-            f"• 💊 Лекарства: <b>{day_medication_total}</b>",
-            f"• Уникальных: <b>{day_medication_unique}</b>",
-            f"• ⚡ Энергия: <b>{_format_level(day_energy_level)}</b>",
-            f"• 😵 Стресс: <b>{_format_level(day_stress_level)}</b>",
-            f"• ⭐ Качество сна: <b>{day_quality:.1f}/5</b>" if day_quality else "• ⭐ Качество сна: <b>нет данных</b>",
-            "",
-            "<b>Быстрые действия</b>",
-            "• вода ведется в отдельной вкладке `Вода`",
-            "• сон и тренировки добавляются кнопками ниже",
-            "• лекарства и состояние ведутся отдельными кнопками",
+            f"• 💊 Лекарства: {day_medication_text}",
+            f"• 🧠 Состояние: {day_wellbeing_text}",
         ]
 
     if mode == HEALTH_MODE_SLEEP_DURATION:
+        if return_mode == HEALTH_MODE_SLEEP_PANEL:
+            lines = _build_health_text(
+                water_ml,
+                sleep_minutes,
+                selected_date,
+                None,
+                mode=HEALTH_MODE_SLEEP_PANEL,
+                summary=summary,
+            ).split("\n")
         lines.extend(["", "<b>Добавление сна</b>", "Выбери длительность сна.", "Или перейди в точный режим."])
     elif mode == HEALTH_MODE_SLEEP_QUALITY:
+        if return_mode == HEALTH_MODE_SLEEP_PANEL:
+            lines = _build_health_text(
+                water_ml,
+                sleep_minutes,
+                selected_date,
+                None,
+                mode=HEALTH_MODE_SLEEP_PANEL,
+                pending_sleep_minutes=pending_sleep_minutes,
+                summary=summary,
+            ).split("\n")
         duration_label = _sleep_duration_label(pending_sleep_minutes or 0)
         lines.extend(["", "<b>Качество сна</b>", f"Длительность: <b>{duration_label}</b>", "Оцени качество по шкале 1-5."])
     elif mode == HEALTH_MODE_SLEEP_EXACT:
+        if return_mode == HEALTH_MODE_SLEEP_PANEL:
+            lines = _build_health_text(
+                water_ml,
+                sleep_minutes,
+                selected_date,
+                None,
+                mode=HEALTH_MODE_SLEEP_PANEL,
+                summary=summary,
+            ).split("\n")
         lines.extend(["", "<b>Точное время сна</b>", "Отправь время сна в формате:", "<b>23:40 07:15</b>", "или", "<b>23:40-07:15</b>", "Первое время — засыпание, второе — подъём.", "Если время засыпания позже времени подъёма, бот считает, что ты уснул накануне."])
     elif mode == HEALTH_MODE_WORKOUT_TYPE:
+        if return_mode == HEALTH_MODE_WORKOUT_PANEL:
+            lines = _build_health_text(
+                water_ml,
+                sleep_minutes,
+                selected_date,
+                None,
+                mode=HEALTH_MODE_WORKOUT_PANEL,
+                summary=summary,
+            ).split("\n")
         lines.extend(["", "<b>Добавление тренировки</b>", "Выбери тип тренировки."])
     elif mode == HEALTH_MODE_WORKOUT_DURATION:
+        if return_mode == HEALTH_MODE_WORKOUT_PANEL:
+            lines = _build_health_text(
+                water_ml,
+                sleep_minutes,
+                selected_date,
+                None,
+                mode=HEALTH_MODE_WORKOUT_PANEL,
+                summary=summary,
+            ).split("\n")
         workout_type = str(summary.get("pending_workout_type") or "")
         workout_label = WORKOUT_TYPE_LABELS.get(workout_type, "Тренировка")
         lines.extend(["", "<b>Добавление тренировки</b>", f"Тип: <b>{workout_label}</b>", "Выбери длительность или нажми `Своё время`."])
@@ -449,9 +521,6 @@ def _build_health_text(
                 "━━━━━━━━━━━━",
             ]
         )
-
-    if day_recent_medications and mode == HEALTH_MODE_SUMMARY_DAY:
-        lines.extend(["", "<b>Последние лекарства</b>", *[f"• {html.escape(str(item))}" for item in day_recent_medications]])
 
     if notice:
         lines.append("")

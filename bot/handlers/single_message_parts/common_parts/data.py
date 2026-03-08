@@ -45,6 +45,7 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         day_water_total = await get_today_water_total(session, user_id, selected_date)
         day_sleep_total = await get_day_sleep_total_minutes(session, user_id, selected_date)
         day_workout_total = await get_day_workout_total_minutes(session, user_id, selected_date)
+        day_workout_details = await get_workout_details_for_period(session, user_id, selected_date, selected_date)
         day_wellbeing = await get_wellbeing_for_day(session, user_id, selected_date)
         day_medication_schedule = await list_medication_schedule_for_day(session, user_id, selected_date)
         day_sleep_details = await get_sleep_details_for_period(session, user_id, selected_date, selected_date)
@@ -59,6 +60,7 @@ async def _load_health_summary(user_id: int, selected_date: date) -> dict[str, i
         "day_water_total": day_water_total,
         "day_sleep_total": day_sleep_total,
         "day_workout_total": day_workout_total,
+        "day_workout_sessions": int(day_workout_details["sessions_count"]),
         "day_energy_level": int(day_wellbeing["energy_level"]),
         "day_stress_level": int(day_wellbeing["stress_level"]),
         "day_has_wellbeing": bool(day_wellbeing["has_entry"]),
