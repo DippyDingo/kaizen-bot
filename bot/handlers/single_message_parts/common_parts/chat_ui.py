@@ -19,10 +19,15 @@ from aiogram.types import (
     WebAppInfo,
 )
 
+from backend.database import async_session
+from backend.services.user_service import (
+    get_or_create_user,
+    get_user_by_telegram_id,
+    set_user_chat_keyboard_message_ref,
+)
 from bot.config import settings
 
 from .constants import (
-    CHAT_BUTTON_CALENDAR,
     CHAT_BUTTON_DIARY,
     CHAT_BUTTON_HEALTH,
     CHAT_BUTTON_HOME,
@@ -53,9 +58,8 @@ def _chat_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=CHAT_BUTTON_HOME), KeyboardButton(text=CHAT_BUTTON_TASKS)],
-            [KeyboardButton(text=CHAT_BUTTON_DIARY), KeyboardButton(text=CHAT_BUTTON_CALENDAR)],
-            [KeyboardButton(text=CHAT_BUTTON_STATS), KeyboardButton(text=CHAT_BUTTON_HEALTH)],
-            [KeyboardButton(text=CHAT_BUTTON_SETTINGS)],
+            [KeyboardButton(text=CHAT_BUTTON_DIARY), KeyboardButton(text=CHAT_BUTTON_STATS)],
+            [KeyboardButton(text=CHAT_BUTTON_HEALTH), KeyboardButton(text=CHAT_BUTTON_SETTINGS)],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -69,6 +73,48 @@ def _reset_chat_ui_state(chat_id: int) -> None:
     CONFIGURED_WEBAPP_CHATS.discard(chat_id)
     CLEARED_COMMAND_CHATS.discard(chat_id)
     log_ui_event("chat_ui_reset", chat_id=chat_id)
+
+
+async def _resolve_carrier_target(message: Message) -> tuple[int, int] | None:
+    chat_id = message.chat.id
+    message_id = CHAT_KEYBOARD_MESSAGES.get(chat_id)
+    if isinstance(message_id, int):
+        return chat_id, message_id
+
+    async with async_session() as session:
+        user = await get_user_by_telegram_id(session, message.from_user.id)
+        if user and user.chat_keyboard_chat_id and user.chat_keyboard_message_id:
+            return int(user.chat_keyboard_chat_id), int(user.chat_keyboard_message_id)
+
+    return None
+
+
+async def _persist_carrier_ref(message: Message, *, chat_id: int | None, message_id: int | None) -> None:
+    if chat_id is None or message_id is None:
+        CHAT_KEYBOARD_MESSAGES.pop(message.chat.id, None)
+    else:
+        CHAT_KEYBOARD_MESSAGES[message.chat.id] = message_id
+
+    async with async_session() as session:
+        user, _ = await get_or_create_user(
+            session=session,
+            telegram_id=message.from_user.id,
+            first_name=message.from_user.first_name,
+            username=message.from_user.username,
+            last_name=message.from_user.last_name,
+        )
+        await set_user_chat_keyboard_message_ref(
+            session,
+            user,
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+
+    log_ui_event(
+        "carrier_ref_persisted",
+        chat_id=chat_id,
+        carrier_message_id=message_id,
+    )
 
 
 async def _set_webapp_menu_button(message: Message) -> None:
@@ -123,34 +169,45 @@ async def _clear_chat_commands(message: Message) -> None:
 
 async def _ensure_chat_keyboard(message: Message, *, force: bool = False, text: str = "🧭 Меню") -> None:
     chat_id = message.chat.id
-    existing_carrier_message_id = CHAT_KEYBOARD_MESSAGES.get(chat_id)
-    if not force and chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS and existing_carrier_message_id:
+    target = await _resolve_carrier_target(message)
+
+    if not force and chat_id in CONFIGURED_REPLY_KEYBOARD_CHATS and target:
         log_ui_event(
             "carrier_reused",
             chat_id=chat_id,
-            carrier_message_id=existing_carrier_message_id,
+            carrier_message_id=target[1],
         )
         return
 
-    previous_message_id = existing_carrier_message_id
+    if not force and target:
+        CHAT_KEYBOARD_MESSAGES[chat_id] = target[1]
+        CONFIGURED_REPLY_KEYBOARD_CHATS.add(chat_id)
+        log_ui_event(
+            "carrier_restored_from_db",
+            chat_id=chat_id,
+            carrier_message_id=target[1],
+        )
+        return
+
+    previous_target = target
+    if previous_target:
+        try:
+            await message.bot.delete_message(chat_id=previous_target[0], message_id=previous_target[1])
+        except TelegramBadRequest:
+            pass
+
     sent = await message.answer(
         text,
         reply_markup=_chat_keyboard(),
         disable_notification=True,
     )
-    CHAT_KEYBOARD_MESSAGES[chat_id] = sent.message_id
     CONFIGURED_REPLY_KEYBOARD_CHATS.add(chat_id)
+    await _persist_carrier_ref(message, chat_id=sent.chat.id, message_id=sent.message_id)
     log_ui_event(
         "carrier_created",
         chat_id=chat_id,
         carrier_message_id=sent.message_id,
     )
-
-    if previous_message_id and previous_message_id != sent.message_id:
-        try:
-            await message.bot.delete_message(chat_id=chat_id, message_id=previous_message_id)
-        except TelegramBadRequest:
-            pass
 
 
 async def _setup_chat_ui(message: Message, *, force_keyboard: bool = False, keyboard_text: str = "🧭 Меню") -> None:

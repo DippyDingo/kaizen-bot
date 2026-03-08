@@ -378,7 +378,7 @@ async def _render_command_view(
     notice: str | None = None,
     *,
     delete_source_message: bool = False,
-    force_keyboard: bool = True,
+    force_keyboard: bool = False,
     relocate_dashboard: bool = False,
     entrypoint: str = "command",
 ) -> None:

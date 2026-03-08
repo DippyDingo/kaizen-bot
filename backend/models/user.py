@@ -20,6 +20,8 @@ class User(Base):
     daily_workout_target_min: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     dashboard_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     dashboard_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    chat_keyboard_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    chat_keyboard_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     exp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

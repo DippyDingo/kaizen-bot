@@ -73,3 +73,17 @@ async def set_user_dashboard_message_ref(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def set_user_chat_keyboard_message_ref(
+    session: AsyncSession,
+    user: User,
+    *,
+    chat_id: int | None,
+    message_id: int | None,
+) -> User:
+    user.chat_keyboard_chat_id = chat_id
+    user.chat_keyboard_message_id = message_id
+    await session.commit()
+    await session.refresh(user)
+    return user

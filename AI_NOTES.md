@@ -59,6 +59,46 @@
 
 ## Последние значимые изменения
 
+### 2026-03-08 — Стабилизация carrier `🧭 Меню`
+
+Что добавлено / изменено:
+- Carrier-сообщение быстрых кнопок у чата переведено на персистентные refs, как и dashboard.
+- В `users` добавлены поля:
+  - `chat_keyboard_chat_id`
+  - `chat_keyboard_message_id`
+- В lifecycle chat UI добавлены:
+  - поиск carrier по памяти и БД;
+  - восстановление carrier ref из БД после рестарта;
+  - удаление старого carrier перед forced recreate;
+  - сохранение нового carrier ref в память и БД.
+- Сокращены лишние forced recreate-path:
+  - `help`, `today`, сохранение имени и slash-навигация больше не должны плодить новые `🧭 Меню`.
+- Из быстрых кнопок у чата удален top-level `📅 Календарь`.
+- Общий `VIEW_CALENDAR` оставлен как скрытый compatibility path, но больше не торчит в основном quick menu.
+
+Измененные файлы концептуально:
+- `backend/models/user.py`
+- `backend/services/user_service.py`
+- `backend/services/__init__.py`
+- `alembic/versions/20260306_000011_add_chat_keyboard_message_ref.py`
+- `bot/handlers/single_message_parts/common_parts/chat_ui.py`
+- `bot/handlers/single_message_parts/common_parts/constants.py`
+- `bot/handlers/single_message_parts/core_parts/builders.py`
+- `bot/handlers/single_message_parts/core_parts/handlers.py`
+- `tests/test_chat_ui.py`
+- `tests/test_user_service.py`
+
+Ограничения / TODO:
+- Recovery после удаления истории по-прежнему требует нового входящего действия пользователя, обычно `/start`. Это ограничение Telegram reply-keyboard, а не кода проекта.
+- TODO: если позже понадобится полностью убрать carrier-сообщение, это уже будет отдельная архитектурная смена с отказом от reply-keyboard в пользу inline-навигации.
+
+Следующий шаг:
+- Применить миграцию и вручную проверить:
+  - несколько `/start` подряд;
+  - onboarding и смену имени;
+  - отсутствие накопления `🧭 Меню`;
+  - новый состав быстрых кнопок без `📅 Календарь`.
+
 ### 2026-03-08 — Перестройка вкладки `Дневник`
 
 Что добавлено / изменено:

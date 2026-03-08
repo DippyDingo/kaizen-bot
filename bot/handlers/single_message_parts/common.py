@@ -13,7 +13,6 @@ from .common_parts.constants import (
     BAR_EMPTY,
     BAR_FILLED,
     BAR_STEPS,
-    CHAT_BUTTON_CALENDAR,
     CHAT_BUTTON_DIARY,
     CHAT_BUTTON_HEALTH,
     CHAT_BUTTON_HOME,

@@ -49,7 +49,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, state: FSMContext) -> None:
-    await _setup_chat_ui(message, force_keyboard=True)
+    await _setup_chat_ui(message)
     await _render(
         from_user=message.from_user,
         state=state,
@@ -88,7 +88,7 @@ async def msg_display_name(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     target_view = data.get("name_origin_view", VIEW_PROFILE)
     await _reset_context(state, view_mode=target_view)
-    await _setup_chat_ui(message, force_keyboard=True)
+    await _setup_chat_ui(message)
     await _render(
         from_user=message.from_user,
         state=state,
@@ -278,7 +278,7 @@ async def cmd_today(message: Message, state: FSMContext) -> None:
         selected_date=today.isoformat(),
         calendar_month=_month_start(today).isoformat(),
     )
-    await _setup_chat_ui(message, force_keyboard=True)
+    await _setup_chat_ui(message)
     await _render(
         from_user=message.from_user,
         state=state,

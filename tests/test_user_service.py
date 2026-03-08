@@ -1,6 +1,7 @@
 import unittest
 
 from backend.services.user_service import (
+    set_user_chat_keyboard_message_ref,
     set_user_dashboard_message_ref,
     set_user_daily_water_target,
     set_user_daily_workout_target,
@@ -12,6 +13,8 @@ class _FakeUser:
     daily_workout_target_min = 30
     dashboard_chat_id = None
     dashboard_message_id = None
+    chat_keyboard_chat_id = None
+    chat_keyboard_message_id = None
 
 
 class _FakeSession:
@@ -47,3 +50,12 @@ class UserServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(123, user.dashboard_chat_id)
         self.assertEqual(456, user.dashboard_message_id)
+
+    async def test_set_user_chat_keyboard_message_ref_updates_message_pointer(self) -> None:
+        user = _FakeUser()
+        session = _FakeSession()
+
+        await set_user_chat_keyboard_message_ref(session, user, chat_id=321, message_id=654)
+
+        self.assertEqual(321, user.chat_keyboard_chat_id)
+        self.assertEqual(654, user.chat_keyboard_message_id)
