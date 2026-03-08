@@ -1,5 +1,6 @@
 from backend.services.diary_service import (
     add_diary_entry,
+    get_diary_calendar_marks,
     get_diary_details_for_period,
     get_diary_entries_count_for_period,
     get_day_diary_entries_count,
@@ -74,6 +75,7 @@ __all__ = [
     "list_tasks_for_date",
     "toggle_task_done",
     "add_diary_entry",
+    "get_diary_calendar_marks",
     "get_diary_details_for_period",
     "get_diary_entries_count_for_period",
     "get_day_diary_entries_count",

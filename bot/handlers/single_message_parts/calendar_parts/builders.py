@@ -53,6 +53,8 @@ def _build_calendar_keyboard(
                 text = f"✖️{day_num}"
             elif context == "med" and marks.get(day_date) == "planned":
                 text = f"💊{day_num}"
+            elif context == "diary" and marks.get(day_date) == "has_entries":
+                text = f"📝{day_num}"
             elif day_date == today:
                 text = f"◦{day_num}"
 
@@ -91,7 +93,6 @@ def _build_calendar_keyboard(
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:browse")])
     elif context == "diary":
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:diary")])
-        rows.append([InlineKeyboardButton(text="📝 Записи", callback_data="cal:to_diary")])
         rows.append([InlineKeyboardButton(text="↩️ Дневник", callback_data="diary:close_calendar")])
     elif context == "med":
         rows.append([InlineKeyboardButton(text="📍 Сегодня", callback_data="cal:today:med")])
@@ -112,11 +113,27 @@ def _build_calendar_text(selected_date: date, notice: str | None) -> str:
     return "\n".join(lines)
 
 
-def _build_diary_calendar_text(selected_date: date, notice: str | None) -> str:
+def _build_diary_calendar_text(selected_date: date, notice: str | None, day_count: int = 0) -> str:
+    if day_count <= 0:
+        summary_line = "На этот день записей нет"
+    else:
+        last_two = day_count % 100
+        last_one = day_count % 10
+        if 11 <= last_two <= 14:
+            word = "записей"
+        elif last_one == 1:
+            word = "запись"
+        elif 2 <= last_one <= 4:
+            word = "записи"
+        else:
+            word = "записей"
+        summary_line = f"{day_count} {word} за день"
+
     lines = [
-        "<b>📅 КАЛЕНДАРЬ ДНЕВНИКА</b>",
-        f"Выбранная дата: <b>{selected_date.strftime('%d.%m.%Y')}</b>",
-        "Выбери день и открой записи.",
+        "<b>📅 Календарь дневника</b>",
+        f"<b>{selected_date.strftime('%d.%m.%Y')}</b>",
+        "📝 есть записи",
+        summary_line,
     ]
     if notice:
         lines.extend(["", f"ℹ️ {notice}"])

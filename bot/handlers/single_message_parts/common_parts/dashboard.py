@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from backend.database import async_session
-from backend.services.diary_service import list_day_diary_entries
+from backend.services.diary_service import get_diary_calendar_marks, list_day_diary_entries
 from backend.services.health_service import get_medication_calendar_marks, list_medication_schedule_for_day
 from backend.services.task_service import get_task_calendar_marks
 from backend.services.user_service import get_or_create_user, set_user_dashboard_message_ref
@@ -464,8 +464,13 @@ async def _render(
         text = _build_water_text(user, water_ml, selected_date, notice)
         keyboard = _build_water_keyboard(selected_date)
     elif view_mode == VIEW_DIARY and diary_calendar_mode:
-        text = _build_diary_calendar_text(selected_date, notice)
-        keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="diary")
+        month_start = _month_start(calendar_month)
+        next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        month_end = next_month - timedelta(days=1)
+        async with async_session() as session:
+            diary_marks = await get_diary_calendar_marks(session, user.id, month_start, month_end)
+        text = _build_diary_calendar_text(selected_date, notice, day_count=diary_count)
+        keyboard = _build_calendar_keyboard(calendar_month, selected_date, context="diary", marks=diary_marks)
     elif view_mode == VIEW_DIARY:
         text = _build_diary_text(diary_entries, selected_date, "main", notice, total_count=diary_count)
         keyboard = _build_diary_keyboard(selected_date, diary_entries)

@@ -82,6 +82,37 @@ async def get_diary_entries_count_for_period(
     return int(result.scalar_one())
 
 
+async def get_diary_calendar_marks(
+    session: AsyncSession,
+    user_id: int,
+    date_from: date,
+    date_to: date,
+) -> dict[date, str]:
+    start_dt = datetime.combine(date_from, datetime.min.time())
+    end_dt = datetime.combine(date_to, datetime.max.time())
+
+    result = await session.execute(
+        select(func.date(DiaryEntry.created_at))
+        .where(
+            and_(
+                DiaryEntry.user_id == user_id,
+                DiaryEntry.created_at >= start_dt,
+                DiaryEntry.created_at <= end_dt,
+            )
+        )
+        .group_by(func.date(DiaryEntry.created_at))
+    )
+
+    marks: dict[date, str] = {}
+    for (entry_date,) in result.all():
+        parsed_date = entry_date
+        if isinstance(entry_date, str):
+            parsed_date = date.fromisoformat(entry_date)
+        if isinstance(parsed_date, date):
+            marks[parsed_date] = "has_entries"
+    return marks
+
+
 async def get_diary_details_for_period(
     session: AsyncSession,
     user_id: int,
